@@ -287,6 +287,7 @@ function newPlayer(src){
   return {
     id: idx, src, pal,
     name: 'Coche '+pal.name,
+    assistWalls: src.type==='kb' && src.profile===1,  // el 2º teclado (Lenovo) lleva paredes
     points: 0,                 // campeonato acumulado
     // estado de carrera reiniciable:
     car:null, lap:1, lapStart:0, checkpoint:false, bestLap:null,
@@ -428,8 +429,23 @@ function stepCar(p, dt){
     }
   }
 
-  // progreso en la pista (segmento más cercano) — para ranking y checkpoint
   const ti=trackInfo(c.x,c.y);
+
+  // PAREDES (solo el coche asistido = 2º teclado / Lenovo): no puede salir del asfalto.
+  // Si toca el borde, se le devuelve dentro y se le reorienta hacia DELANTE, frenando.
+  if(p.assistWalls){
+    const a=center[ti.seg], b=center[(ti.seg+1)%center.length];
+    const cpx=a.x+ti.t*(b.x-a.x), cpy=a.y+ti.t*(b.y-a.y); // punto más cercano del eje
+    const wall=TRACK_HW-8;                                 // borde efectivo (deja sitio al coche)
+    if(ti.d>wall){
+      const nx=(c.x-cpx)/(ti.d||1), ny=(c.y-cpy)/(ti.d||1);
+      c.x=cpx+nx*wall; c.y=cpy+ny*wall;                    // pegado al borde, por dentro
+      c.angle=Math.atan2(b.y-a.y, b.x-a.x);                // mirando hacia delante
+      if(c.speed>130) c.speed=130;                         // rebote suave
+    }
+  }
+
+  // progreso en la pista (segmento más cercano) — para ranking y checkpoint
   p.progress=(p.lap-1) + (ti.seg + ti.t)/center.length;
 
   // checkpoint anti-trampa: haber pasado por la zona media del circuito
@@ -620,6 +636,24 @@ function drawCountdown(){
   ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 140px system-ui';
   ctx.fillText(n>0?n:'¡YA!', WORLD_W/2, WORLD_H/2+50);
 }
+// Leyenda de teclas abajo a la derecha (solo los esquemas que hay en juego)
+function drawLegend(){
+  const lines=[];
+  if(players.some(p=>p.src.type==='kb'&&p.src.profile===0)) lines.push('Mando TV:  4 ◀  6 ▶  ·  8 acel  ·  5 aceite  ·  0 turbo');
+  if(players.some(p=>p.src.type==='kb'&&p.src.profile===1)) lines.push('Lenovo:  A ◀  D ▶  ·  W acel  ·  F aceite  ·  Q turbo  🧱');
+  if(players.some(p=>p.src.type==='pad'))                    lines.push('Gamepad:  stick ◀▶  ·  A acel  ·  B aceite  ·  X turbo');
+  if(!lines.length) return;
+  ctx.textAlign='left'; ctx.font='16px system-ui';
+  let maxW=0; for(const t of lines) maxW=Math.max(maxW, ctx.measureText(t).width);
+  const pad=12, lh=22, titleH=24;
+  const boxW=maxW+pad*2, boxH=titleH+lines.length*lh+pad;
+  const x=WORLD_W-boxW-14, y=WORLD_H-boxH-14;
+  ctx.fillStyle='rgba(10,12,18,.62)'; rr(x,y,boxW,boxH,10); ctx.fill();
+  ctx.fillStyle='#ffd34d'; ctx.font='bold 15px system-ui';
+  ctx.fillText('CONTROLES', x+pad, y+pad+10);
+  ctx.fillStyle='#eef3fb'; ctx.font='16px system-ui';
+  lines.forEach((t,i)=> ctx.fillText(t, x+pad, y+pad+titleH+i*lh));
+}
 
 function render(){
   ctx.setTransform(1,0,0,1,0,0);
@@ -631,7 +665,7 @@ function render(){
   if(state===STATE.RACE||state===STATE.COUNTDOWN||state===STATE.RESULTS){
     for(const p of players) if(p.car) drawCar(p);
   }
-  if(state===STATE.RACE||state===STATE.COUNTDOWN) drawHUD();
+  if(state===STATE.RACE||state===STATE.COUNTDOWN){ drawHUD(); drawLegend(); }
   if(state===STATE.COUNTDOWN) drawCountdown();
 }
 
