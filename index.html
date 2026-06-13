@@ -71,7 +71,7 @@
   }
   .carcard.sel { border-color:#ffd34d; box-shadow:0 0 2vh rgba(255,211,77,.55); }
   .carcard.locked { opacity:.5; }
-  .carprev { width:120px; max-width:100%; height:auto; background:#0f131c; border-radius:.8vh; }
+  .carprev { width:13vh; height:13vh; object-fit:contain; image-rendering:auto; }
   .carcard .cname { font-size:1.9vh; font-weight:700; }
   .carcard .cprice { font-size:1.7vh; }
   .carcard .ctag { font-size:1.5vh; font-weight:800; }
@@ -97,7 +97,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v21</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v22</div>
 </div>
 
 <!-- TIENDA -->
@@ -767,17 +767,10 @@ function renderShop(){
     else if(owned) tag='<span class="ctag" style="color:#9fb4d8">comprado</span>';
     else tag=`<span class="ctag" style="color:#ffd34d">🪙 ${c.price}</span>`;
     h+=`<div class="${cls}">
-      <canvas class="carprev" width="120" height="64" data-shape="${c.shape}" data-body="${c.body||'#888c96'}" data-accent="${c.accent}"></canvas>
+      <img class="carprev" src="assets/cars/${c.id}.png" alt="${c.name}" loading="lazy">
       <div class="cname">${c.name}</div>${tag}</div>`;
   });
   els.shopGrid.innerHTML=h;
-  // dibujar cada coche en su mini-canvas
-  els.shopGrid.querySelectorAll('canvas.carprev').forEach(cv=>{
-    const g2=cv.getContext('2d'); g2.clearRect(0,0,cv.width,cv.height);
-    g2.save(); g2.translate(cv.width/2, cv.height/2); g2.scale(1.5,1.5);
-    drawCarBody(g2, cv.dataset.shape, cv.dataset.body, cv.dataset.accent);
-    g2.restore();
-  });
 }
 
 function update(dt){
