@@ -71,8 +71,7 @@
   }
   .carcard.sel { border-color:#ffd34d; box-shadow:0 0 2vh rgba(255,211,77,.55); }
   .carcard.locked { opacity:.5; }
-  .carswatch { width:100%; height:6.5vh; border-radius:.8vh; position:relative; overflow:hidden; }
-  .carswatch .stripe { position:absolute; left:0; right:0; top:42%; height:16%; }
+  .carprev { width:120px; max-width:100%; height:auto; background:#0f131c; border-radius:.8vh; }
   .carcard .cname { font-size:1.9vh; font-weight:700; }
   .carcard .cprice { font-size:1.7vh; }
   .carcard .ctag { font-size:1.5vh; font-weight:800; }
@@ -98,16 +97,16 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v19</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v20</div>
 </div>
 
 <!-- TIENDA -->
 <div id="shop" class="panel hidden">
   <h1>🛒 Tienda de coches</h1>
-  <h2>Jugador: <span id="shopName" style="color:#ffd34d">—</span> &nbsp;·&nbsp; 🪙 <span id="shopCoins">0</span> monedas
-     <span class="small">(cambia jugador con 7 / 9)</span></h2>
+  <h2>Comprando para: <b>7</b> ◂ <span id="shopName" style="color:#ffd34d">—</span> ▸ <b>9</b>
+     &nbsp;·&nbsp; 🪙 <span id="shopCoins" style="color:#ffd34d">0</span> monedas</h2>
   <div id="shopGrid" class="shopgrid"></div>
-  <p class="badge">◀▶ (4/6) elegir · <b>5</b>/OK comprar o equipar · <b>2</b> volver</p>
+  <p class="badge"><b>7/9</b> cambiar de jugador · <b>4/6</b> elegir coche · <b>5</b>/OK comprar o equipar · <b>2</b> volver</p>
 </div>
 
 <!-- EDITOR DE NOMBRES -->
@@ -257,16 +256,16 @@ const PALETTE = [
 // Catálogo de la tienda. id 0 = básico (gratis, usa el color del jugador).
 // El resto son coches con color/franja propios que se compran con monedas.
 const CARS = [
-  { id:0, name:'Básico',        price:0,   body:null,      accent:'#bfe3ff' },
-  { id:1, name:'Bólido Rojo',   price:60,  body:'#e8473f', accent:'#ffd34d' },
-  { id:2, name:'Rayo Azul',     price:60,  body:'#2f6fe0', accent:'#bfe3ff' },
-  { id:3, name:'Verde Turbo',   price:90,  body:'#27a046', accent:'#d6ffe0' },
-  { id:4, name:'Rosa Chicle',   price:120, body:'#e85ca8', accent:'#ffd6ef' },
-  { id:5, name:'Naranja Fuego', price:140, body:'#ef7d2a', accent:'#ffe0a0' },
-  { id:6, name:'Sombra',        price:180, body:'#2a2f3a', accent:'#8aa0c0' },
-  { id:7, name:'Aguamarina',    price:220, body:'#1fb6b6', accent:'#d3fffb' },
-  { id:8, name:'Dorado',        price:320, body:'#d9a92a', accent:'#fff2b0' },
-  { id:9, name:'Arcoíris',      price:500, body:'#9b59b6', accent:'#ffffff' },
+  { id:0, name:'Básico',         price:0,   shape:'basico',    body:null,      accent:'#bfe3ff' },
+  { id:1, name:'Deportivo Rojo', price:60,  shape:'deportivo', body:'#e8473f', accent:'#ffd34d' },
+  { id:2, name:'Deportivo Azul', price:60,  shape:'deportivo', body:'#2f6fe0', accent:'#bfe3ff' },
+  { id:3, name:'Buggy Verde',    price:90,  shape:'buggy',     body:'#27a046', accent:'#d6ffe0' },
+  { id:4, name:'Buggy Rosa',     price:120, shape:'buggy',     body:'#e85ca8', accent:'#ffd6ef' },
+  { id:5, name:'Camión Naranja', price:150, shape:'camion',    body:'#ef7d2a', accent:'#ffe0a0' },
+  { id:6, name:'Furgo Aqua',     price:180, shape:'furgo',     body:'#1fb6b6', accent:'#d3fffb' },
+  { id:7, name:'F1 Sombra',      price:240, shape:'f1',        body:'#2a2f3a', accent:'#8aa0c0' },
+  { id:8, name:'F1 Dorado',      price:320, shape:'f1',        body:'#d9a92a', accent:'#fff2b0' },
+  { id:9, name:'Bala Arcoíris',  price:500, shape:'bala',      body:'#9b59b6', accent:'#ffffff' },
 ];
 function carById(id){ return CARS.find(c=>c.id===id) || CARS[0]; }
 
@@ -457,7 +456,7 @@ function newPlayer(src){
   const p = {
     id: idx, src, pal,
     nameIdx, name: roster[nameIdx],            // nombre elegido del roster (gira ◀▶ en lobby)
-    body: pal.body, accent:'#bfe3ff',          // color del coche (se ajusta al equipado)
+    body: pal.body, accent:'#bfe3ff', shape:'basico',   // coche (se ajusta al equipado)
     assistWalls: src.type==='kb' && src.profile===1,  // el 2º teclado (Lenovo) lleva paredes
     points: 0,                 // campeonato acumulado
     // estado de carrera reiniciable:
@@ -472,6 +471,7 @@ function refreshPlayerCar(p){
   const sty = carStyleFor(p.name);
   p.body = sty ? sty.body : p.pal.body;
   p.accent = sty ? sty.accent : '#bfe3ff';
+  p.shape = sty ? sty.shape : 'basico';
 }
 function hasKbProfile(i){ return players.some(p=>p.src.type==='kb'&&p.src.profile===i); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
@@ -762,16 +762,22 @@ function renderShop(){
     const owned=g.owned.includes(c.id), equipped=g.selected===c.id;
     const can = owned || coins>=c.price;
     const cls = 'carcard'+(i===shopSel?' sel':'')+(can?'':' locked');
-    const body = c.body || '#888c96';
     let tag;
     if(equipped) tag='<span class="ctag" style="color:#7ee081">✓ EN USO</span>';
     else if(owned) tag='<span class="ctag" style="color:#9fb4d8">comprado</span>';
     else tag=`<span class="ctag" style="color:#ffd34d">🪙 ${c.price}</span>`;
     h+=`<div class="${cls}">
-      <div class="carswatch" style="background:${body}"><div class="stripe" style="background:${c.accent}"></div></div>
+      <canvas class="carprev" width="120" height="64" data-shape="${c.shape}" data-body="${c.body||'#888c96'}" data-accent="${c.accent}"></canvas>
       <div class="cname">${c.name}</div>${tag}</div>`;
   });
   els.shopGrid.innerHTML=h;
+  // dibujar cada coche en su mini-canvas
+  els.shopGrid.querySelectorAll('canvas.carprev').forEach(cv=>{
+    const g2=cv.getContext('2d'); g2.clearRect(0,0,cv.width,cv.height);
+    g2.save(); g2.translate(cv.width/2, cv.height/2); g2.scale(1.5,1.5);
+    drawCarBody(g2, cv.dataset.shape, cv.dataset.body, cv.dataset.accent);
+    g2.restore();
+  });
 }
 
 function update(dt){
@@ -966,14 +972,66 @@ function drawOils(){
   }
 }
 function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function rrp(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+// dibuja un coche centrado en el origen, mirando a +x (reutilizable en juego y tienda)
+function drawCarBody(g, shape, body, accent){
+  g.lineJoin='round';
+  const wh=(x,y,w,h)=>{ g.fillStyle='#111'; g.fillRect(x,y,w,h); };
+  if(shape==='deportivo'){
+    wh(-12,-13,8,4); wh(-12,9,8,4); wh(7,-13,8,4); wh(7,9,8,4);
+    g.fillStyle=body; g.beginPath(); g.moveTo(18,0); g.lineTo(7,-11); g.lineTo(-15,-11); g.quadraticCurveTo(-19,0,-15,11); g.lineTo(7,11); g.closePath(); g.fill();
+    g.fillStyle=accent; g.fillRect(-7,-11,5,22);
+    g.fillStyle='#bfe3ff'; g.beginPath(); g.moveTo(8,0); g.lineTo(0,-6); g.lineTo(0,6); g.closePath(); g.fill();
+    return;
+  }
+  if(shape==='buggy'){
+    wh(-15,-15,11,6); wh(-15,9,11,6); wh(5,-15,11,6); wh(5,9,11,6);   // ruedas grandes
+    g.fillStyle=body; rrp(g,-13,-9,27,18,7); g.fill();
+    g.fillStyle=accent; g.fillRect(-4,-9,5,18);
+    g.fillStyle='#1b1b1b'; rrp(g,-3,-6,9,12,2); g.fill();             // jaula
+    return;
+  }
+  if(shape==='camion'){
+    wh(-14,-14,9,5); wh(-14,9,9,5); wh(7,-14,9,5); wh(7,9,9,5);
+    g.fillStyle=body; rrp(g,-18,-12,30,24,4); g.fill();              // caja de carga
+    g.fillStyle='#2a2f3a'; rrp(g,9,-11,9,22,3); g.fill();            // cabina
+    g.fillStyle='#bfe3ff'; g.fillRect(15,-8,2,16);
+    g.fillStyle=accent; g.fillRect(-12,-12,5,24);
+    return;
+  }
+  if(shape==='furgo'){
+    wh(-13,-14,8,5); wh(-13,9,8,5); wh(8,-14,8,5); wh(8,9,8,5);
+    g.fillStyle=body; rrp(g,-19,-12,38,24,5); g.fill();
+    g.fillStyle='#bfe3ff'; g.fillRect(10,-9,6,18);
+    g.fillStyle=accent; g.fillRect(-13,-12,5,24);
+    return;
+  }
+  if(shape==='f1'){
+    g.fillStyle='#222'; g.fillRect(14,-9,4,18); g.fillRect(-19,-8,4,16);  // alerones
+    wh(2,-15,9,5); wh(2,10,9,5); wh(-13,-14,9,5); wh(-13,9,9,5);          // ruedas descubiertas
+    g.fillStyle=body; rrp(g,-15,-6,30,12,6); g.fill();
+    g.fillStyle=accent; g.fillRect(-2,-6,5,12);
+    g.fillStyle='#111'; g.beginPath(); g.ellipse(-3,0,4,4,0,0,7); g.fill();
+    return;
+  }
+  if(shape==='bala'){
+    wh(-11,-12,7,4); wh(-11,8,7,4); wh(5,-12,7,4); wh(5,8,7,4);
+    g.fillStyle=body; g.beginPath(); g.ellipse(0,0,18,10,0,0,Math.PI*2); g.fill();
+    g.fillStyle=accent; g.fillRect(-5,-10,5,20);
+    g.fillStyle='#bfe3ff'; g.beginPath(); g.ellipse(4,0,5,5,0,0,Math.PI*2); g.fill();
+    return;
+  }
+  // básico
+  wh(-13,-13,8,4); wh(-13,9,8,4); wh(8,-13,8,4); wh(8,9,8,4);
+  g.fillStyle=body; rrp(g,-17,-11,34,22,5); g.fill();
+  g.fillStyle=accent; g.fillRect(-6,-11,5,22);
+  g.fillStyle='#bfe3ff'; g.fillRect(1,-8,9,16);
+}
 function drawCar(p){
   const c=p.car; ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.angle);
   if(p.boostT>0){ ctx.fillStyle='rgba(255,180,60,.85)'; ctx.beginPath(); ctx.moveTo(-17,-6); ctx.lineTo(-30-Math.random()*8,0); ctx.lineTo(-17,6); ctx.fill(); }
-  ctx.fillStyle='rgba(0,0,0,.3)'; rr(-16,-9,34,20,5); ctx.fill();
-  ctx.fillStyle=p.body; rr(-17,-11,34,22,5); ctx.fill();
-  ctx.fillStyle=p.accent; ctx.fillRect(-6,-11,5,22);     // franja del color de acento
-  ctx.fillStyle='#bfe3ff'; ctx.fillRect(1,-8,9,16);
-  ctx.fillStyle='#111'; ctx.fillRect(-13,-13,8,4); ctx.fillRect(-13,9,8,4); ctx.fillRect(8,-13,8,4); ctx.fillRect(8,9,8,4);
+  ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0,0,19,12,0,0,Math.PI*2); ctx.fill();
+  drawCarBody(ctx, p.shape, p.body, p.accent);
   ctx.restore();
   // etiqueta con el nombre elegido (con contorno para que se lea sobre la pista)
   ctx.font='bold 16px system-ui'; ctx.textAlign='center';
