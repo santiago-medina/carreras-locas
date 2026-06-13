@@ -97,7 +97,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v24</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v25</div>
 </div>
 
 <!-- TIENDA -->
@@ -456,6 +456,19 @@ function applySeed(){
 }
 applySeed();
 
+// Pide ALMACENAMIENTO PERSISTENTE: el navegador no debe borrar estos datos al
+// cerrarse ni por limpieza automática. (Estándar Storage API.)
+let persistState = 'desconocido';
+(async()=>{
+  try{
+    if(navigator.storage && navigator.storage.persist){
+      const already = await navigator.storage.persisted();
+      const ok = already || await navigator.storage.persist();
+      persistState = ok ? 'persistente ✓' : 'NO persistente';
+    } else persistState = 'no soportado';
+  }catch(e){ persistState='error'; }
+})();
+
 function renderLapRecord(){
   const r = getBestLap();
   els.lapRecord.textContent = r ? `${r.time.toFixed(2)}s (${r.name})` : '—';
@@ -571,7 +584,7 @@ function renderLobby(){
   const pads=padList(); let nPads=0;
   for(let i=0;i<pads.length;i++) if(pads[i]) nPads++;
   const diag=document.getElementById('diag');
-  if(diag) diag.textContent = `Diagnóstico — Gamepads detectados: ${nPads} · Última tecla: ${lastKey}`;
+  if(diag) diag.textContent = `Diagnóstico — Gamepads: ${nPads} · Última tecla: ${lastKey} · Guardado: ${persistState}`;
 }
 
 //==================================================================
