@@ -66,7 +66,7 @@
   <p class="badge" id="startHint">Esperando jugadores…</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v9</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v10</div>
 </div>
 
 <!-- COUNTDOWN / RESULTS use canvas; RESULTS panel below -->
@@ -442,10 +442,15 @@ function stepCar(p, dt){
     const cpx=a.x+ti.t*(b.x-a.x), cpy=a.y+ti.t*(b.y-a.y); // punto más cercano del eje
     const wall=TRACK_HW-8;                                 // borde efectivo (deja sitio al coche)
     if(ti.d>wall){
-      const nx=(c.x-cpx)/(ti.d||1), ny=(c.y-cpy)/(ti.d||1);
-      c.x=cpx+nx*wall; c.y=cpy+ny*wall;                    // pegado al borde, por dentro
-      c.angle=Math.atan2(b.y-a.y, b.x-a.x);                // mirando hacia delante
-      if(c.speed>130) c.speed=130;                         // rebote suave
+      const nx=(c.x-cpx)/(ti.d||1), ny=(c.y-cpy)/(ti.d||1); // normal hacia FUERA (eje→coche)
+      // recolocar DENTRO del borde (no pegado) para despegarlo de la pared
+      c.x=cpx+nx*(wall-14); c.y=cpy+ny*(wall-14);
+      // dirección de rebote: hacia delante (tangente) + hacia dentro (−normal)
+      const tang=Math.atan2(b.y-a.y, b.x-a.x);
+      const dx=Math.cos(tang)*0.75 - nx*0.7;
+      const dy=Math.sin(tang)*0.75 - ny*0.7;
+      c.angle=Math.atan2(dy, dx);
+      c.speed=Math.max(110, c.speed*0.5);                  // sale despedido, no se engancha
     }
   }
 
