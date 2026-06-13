@@ -97,7 +97,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v25</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v26</div>
 </div>
 
 <!-- TIENDA -->
@@ -440,21 +440,23 @@ function getGarage(name){ const g=loadMap(LS_GARAGE)[name]; return (g&&Array.isA
 function setGarage(name,g){ const m=loadMap(LS_GARAGE); m[name]=g; saveMap(LS_GARAGE,m); }
 function carStyleFor(name){ const sel=getGarage(name).selected; return sel ? carById(sel) : null; } // null = básico (color de jugador)
 
-// Siembra de datos: se aplica UNA sola vez (marca carGameSeed). Si se borra el
-// navegador, la marca también desaparece, así que estos valores REAPARECEN solos.
-const SEED_VERSION = 1;
-function applySeed(){
+// Base de datos garantizada: se comprueba en CADA recarga. Rellena lo que falte
+// (p. ej. tras un borrado del navegador) pero NO pisa lo que ya tengáis guardado.
+function ensureBaseline(){
   try{
-    if((+localStorage.getItem('carGameSeed')||0) >= SEED_VERSION) return;
-    // monedas iniciales
-    const w=loadMap(LS_WALLET); w['Rojo']=155; w['Morado']=40; saveMap(LS_WALLET,w);
-    // récord de vuelta rápida del circuito 'Clásico'
+    const w=loadMap(LS_WALLET); let chW=false;
+    if(w['Rojo']===undefined){ w['Rojo']=155; chW=true; }       // solo si no existe
+    if(w['Morado']===undefined){ w['Morado']=40; chW=true; }
+    if(chW) saveMap(LS_WALLET,w);
+    // récord de vuelta del 'Clásico': Juan 6.63 (se añade si no está ya)
     const lap=loadMap(LS_LAP); const l=lap['Clásico']||[];
-    l.push({name:'Juan', time:6.63}); l.sort((a,b)=>a.time-b.time); lap['Clásico']=l.slice(0,TOP_N); saveMap(LS_LAP,lap);
-    localStorage.setItem('carGameSeed', String(SEED_VERSION));
+    if(!l.some(e=>e.name==='Juan' && Math.abs(e.time-6.63)<0.005)){
+      l.push({name:'Juan', time:6.63}); l.sort((a,b)=>a.time-b.time);
+      lap['Clásico']=l.slice(0,TOP_N); saveMap(LS_LAP,lap);
+    }
   }catch(e){}
 }
-applySeed();
+ensureBaseline();
 
 // Pide ALMACENAMIENTO PERSISTENTE: el navegador no debe borrar estos datos al
 // cerrarse ni por limpieza automática. (Estándar Storage API.)
