@@ -64,6 +64,18 @@
     margin-top:1vh; padding:1.2vh 2.6vh; font-size:2.4vh; font-weight:800; cursor:pointer;
     border:none; border-radius:1vh; background:#ffd34d; color:#11141c;
   }
+  .shopgrid { display:flex; flex-wrap:wrap; gap:1.8vh; justify-content:center; margin:2vh auto; max-width:92vw; }
+  .carcard {
+    width:19vh; padding:1.4vh; border-radius:1.2vh; background:#161b26; border:.4vh solid #2a3140;
+    display:flex; flex-direction:column; align-items:center; gap:.6vh;
+  }
+  .carcard.sel { border-color:#ffd34d; box-shadow:0 0 2vh rgba(255,211,77,.55); }
+  .carcard.locked { opacity:.5; }
+  .carswatch { width:100%; height:6.5vh; border-radius:.8vh; position:relative; overflow:hidden; }
+  .carswatch .stripe { position:absolute; left:0; right:0; top:42%; height:16%; }
+  .carcard .cname { font-size:1.9vh; font-weight:700; }
+  .carcard .cprice { font-size:1.7vh; }
+  .carcard .ctag { font-size:1.5vh; font-weight:800; }
 </style>
 </head>
 <body>
@@ -81,12 +93,21 @@
     <span style="opacity:.7">Empezar la carrera: <b>0</b>, <b>S</b>, OK, Start del gamepad, o pulsa otra vez tu tecla de unirte (<b>5</b>/<b>G</b>)</span>
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
-  <p class="small">Tras unirte, <b>gira ◀▶</b> (4/6, A/D o cruceta) para elegir tu nombre &nbsp;·&nbsp; <b>8</b> → editar nombres ✏️</p>
+  <p class="small">Tras unirte, <b>gira ◀▶</b> (4/6, A/D o cruceta) para elegir tu nombre &nbsp;·&nbsp; <b>8</b> → editar nombres ✏️ &nbsp;·&nbsp; <b>2</b> → Tienda 🛒</p>
   <p class="badge" id="startHint">Esperando jugadores…</p>
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v18</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v19</div>
+</div>
+
+<!-- TIENDA -->
+<div id="shop" class="panel hidden">
+  <h1>🛒 Tienda de coches</h1>
+  <h2>Jugador: <span id="shopName" style="color:#ffd34d">—</span> &nbsp;·&nbsp; 🪙 <span id="shopCoins">0</span> monedas
+     <span class="small">(cambia jugador con 7 / 9)</span></h2>
+  <div id="shopGrid" class="shopgrid"></div>
+  <p class="badge">◀▶ (4/6) elegir · <b>5</b>/OK comprar o equipar · <b>2</b> volver</p>
 </div>
 
 <!-- EDITOR DE NOMBRES -->
@@ -233,6 +254,22 @@ const PALETTE = [
   {name:'Morado',  body:'#a85ce8', glow:'#cf9bff'},
 ];
 
+// Catálogo de la tienda. id 0 = básico (gratis, usa el color del jugador).
+// El resto son coches con color/franja propios que se compran con monedas.
+const CARS = [
+  { id:0, name:'Básico',        price:0,   body:null,      accent:'#bfe3ff' },
+  { id:1, name:'Bólido Rojo',   price:60,  body:'#e8473f', accent:'#ffd34d' },
+  { id:2, name:'Rayo Azul',     price:60,  body:'#2f6fe0', accent:'#bfe3ff' },
+  { id:3, name:'Verde Turbo',   price:90,  body:'#27a046', accent:'#d6ffe0' },
+  { id:4, name:'Rosa Chicle',   price:120, body:'#e85ca8', accent:'#ffd6ef' },
+  { id:5, name:'Naranja Fuego', price:140, body:'#ef7d2a', accent:'#ffe0a0' },
+  { id:6, name:'Sombra',        price:180, body:'#2a2f3a', accent:'#8aa0c0' },
+  { id:7, name:'Aguamarina',    price:220, body:'#1fb6b6', accent:'#d3fffb' },
+  { id:8, name:'Dorado',        price:320, body:'#d9a92a', accent:'#fff2b0' },
+  { id:9, name:'Arcoíris',      price:500, body:'#9b59b6', accent:'#ffffff' },
+];
+function carById(id){ return CARS.find(c=>c.id===id) || CARS[0]; }
+
 // Perfiles de teclado: cada uno usa TECLAS DISTINTAS para que dos jugadores
 // puedan compartir el mismo "teclado" (mando TV con números + 2º teclado con letras).
 const KB_PROFILES = [
@@ -321,7 +358,7 @@ function readInput(p){
 //==================================================================
 // Estado de juego
 //==================================================================
-const STATE = { LOBBY:0, COUNTDOWN:1, RACE:2, RESULTS:3, HISCORES:4, NAMES:5 };
+const STATE = { LOBBY:0, COUNTDOWN:1, RACE:2, RESULTS:3, HISCORES:4, NAMES:5, SHOP:6 };
 let state = STATE.LOBBY;
 let players = [];          // persistente entre carreras (campeonato)
 let oils = [];             // {x,y,r,life}
@@ -330,6 +367,7 @@ let countdown = 0, raceClock = 0, leaderFinishTimer = -1;
 let autoAccel = true;
 let newLapRec = null, newRaceRec = null;   // récords batidos en la carrera actual
 let hsFrom = STATE.LOBBY;                   // desde dónde se abrió Hi-Scores
+let shopNameIdx = 0, shopSel = 0;          // tienda: nombre activo y coche resaltado
 
 const els = {
   lobby: document.getElementById('lobby'),
@@ -349,6 +387,10 @@ const els = {
   names: document.getElementById('names'),
   nameInputs: document.getElementById('nameInputs'),
   namesSave: document.getElementById('namesSave'),
+  shop: document.getElementById('shop'),
+  shopName: document.getElementById('shopName'),
+  shopCoins: document.getElementById('shopCoins'),
+  shopGrid: document.getElementById('shopGrid'),
 };
 
 //==================================================================
@@ -387,6 +429,15 @@ function getBestRace(){ return getRaceList()[0] || null; }
 function loadChamp(){ try{ return JSON.parse(localStorage.getItem(LS_CHAMP))||{}; }catch(e){ return {}; } }
 function saveChamp(c){ try{ localStorage.setItem(LS_CHAMP, JSON.stringify(c)); }catch(e){} }
 
+// Economía: monedas y garaje POR NOMBRE
+const LS_WALLET = 'carGameWallet';
+const LS_GARAGE = 'carGameGarage';
+function getWallet(name){ return loadMap(LS_WALLET)[name] || 0; }
+function addCoins(name, n){ const m=loadMap(LS_WALLET); m[name]=(m[name]||0)+n; saveMap(LS_WALLET,m); }
+function getGarage(name){ const g=loadMap(LS_GARAGE)[name]; return (g&&Array.isArray(g.owned)) ? g : {owned:[0], selected:0}; }
+function setGarage(name,g){ const m=loadMap(LS_GARAGE); m[name]=g; saveMap(LS_GARAGE,m); }
+function carStyleFor(name){ const sel=getGarage(name).selected; return sel ? carById(sel) : null; } // null = básico (color de jugador)
+
 function renderLapRecord(){
   const r = getBestLap();
   els.lapRecord.textContent = r ? `${r.time.toFixed(2)}s (${r.name})` : '—';
@@ -403,15 +454,24 @@ function newPlayer(src){
   let nameIdx = idx % roster.length;
   const saved = picks[sourceKey(src)];        // restaurar la última elección de este mando
   if(saved){ const j=roster.indexOf(saved); if(j>=0) nameIdx=j; }
-  return {
+  const p = {
     id: idx, src, pal,
     nameIdx, name: roster[nameIdx],            // nombre elegido del roster (gira ◀▶ en lobby)
+    body: pal.body, accent:'#bfe3ff',          // color del coche (se ajusta al equipado)
     assistWalls: src.type==='kb' && src.profile===1,  // el 2º teclado (Lenovo) lleva paredes
     points: 0,                 // campeonato acumulado
     // estado de carrera reiniciable:
     car:null, lap:1, lapStart:0, checkpoint:false, bestLap:null,
     finished:false, finishOrder:0, progress:0, spin:0, boostT:0, oilCd:0, boostCd:0,
   };
+  refreshPlayerCar(p);
+  return p;
+}
+// fija el color del coche según el coche equipado por su nombre (o el de jugador si es básico)
+function refreshPlayerCar(p){
+  const sty = carStyleFor(p.name);
+  p.body = sty ? sty.body : p.pal.body;
+  p.accent = sty ? sty.accent : '#bfe3ff';
 }
 function hasKbProfile(i){ return players.some(p=>p.src.type==='kb'&&p.src.profile===i); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
@@ -453,6 +513,7 @@ function lobbyJoin(){
     if(d){
       p.nameIdx=((p.nameIdx+d)%roster.length+roster.length)%roster.length;
       p.name=roster[p.nameIdx];
+      refreshPlayerCar(p);                               // su coche equipado
       picks[sourceKey(p.src)]=p.name; savePick(picks);   // recordar la elección
     }
   }
@@ -472,9 +533,9 @@ function renderLobby(){
   for(let i=0;i<5;i++){
     const p=players[i];
     if(p){
-      html+=`<div class="pcard"><div class="dot" style="background:${p.pal.body}"></div>
+      html+=`<div class="pcard"><div class="dot" style="background:${p.body}"></div>
         <div class="who">◀ ${p.name} ▶</div>
-        <div class="src">${p.src.type==='kb'?KB_PROFILES[p.src.profile].label:'Gamepad '+(p.src.index+1)}</div></div>`;
+        <div class="src">🪙 ${getWallet(p.name)} · ${p.src.type==='kb'?KB_PROFILES[p.src.profile].label:'Gamepad '+(p.src.index+1)}</div></div>`;
     } else {
       html+=`<div class="pcard empty"><div class="dot" style="background:#2a3140"></div>
         <div class="who">Libre</div><div class="src">Pulsa un botón</div></div>`;
@@ -658,21 +719,78 @@ function openNames(){
   els.nameInputs.innerHTML=h;
 }
 function closeNames(){
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   const vals=[...els.nameInputs.querySelectorAll('input')].map(x=>x.value.trim()).filter(Boolean);
   roster = vals.length ? vals : DEFAULT_NAMES.slice();
   setRoster(roster);
   // refrescar nombres de jugadores ya unidos
-  for(const p of players){ p.nameIdx=Math.min(p.nameIdx, roster.length-1); p.name=roster[p.nameIdx]; }
+  for(const p of players){ p.nameIdx=Math.min(p.nameIdx, roster.length-1); p.name=roster[p.nameIdx]; refreshPlayerCar(p); }
   els.names.classList.add('hidden'); state=STATE.LOBBY; els.lobby.classList.remove('hidden');
 }
 els.namesSave.addEventListener('click', closeNames);
+
+// ---- TIENDA ----
+function openShop(){
+  state=STATE.SHOP;
+  // arrancar en el nombre del primer jugador unido (o el primero del roster)
+  shopNameIdx = players.length ? players[0].nameIdx : 0;
+  shopSel = 0;
+  els.lobby.classList.add('hidden'); els.shop.classList.remove('hidden');
+  renderShop();
+}
+function closeShop(){
+  els.shop.classList.add('hidden');
+  // refrescar el coche de los jugadores cuyo nombre haya cambiado de coche en la tienda
+  for(const p of players) refreshPlayerCar(p);
+  state=STATE.LOBBY; els.lobby.classList.remove('hidden');
+}
+function shopBuyOrEquip(){
+  const name=roster[shopNameIdx], car=CARS[shopSel], g=getGarage(name);
+  if(g.owned.includes(car.id)){
+    g.selected=car.id; setGarage(name,g);              // equipar
+  } else if(getWallet(name) >= car.price){
+    addCoins(name, -car.price);                        // comprar + equipar
+    g.owned.push(car.id); g.selected=car.id; setGarage(name,g);
+  }
+  renderShop();
+}
+function renderShop(){
+  const name=roster[shopNameIdx], g=getGarage(name), coins=getWallet(name);
+  els.shopName.textContent=name; els.shopCoins.textContent=coins;
+  let h='';
+  CARS.forEach((c,i)=>{
+    const owned=g.owned.includes(c.id), equipped=g.selected===c.id;
+    const can = owned || coins>=c.price;
+    const cls = 'carcard'+(i===shopSel?' sel':'')+(can?'':' locked');
+    const body = c.body || '#888c96';
+    let tag;
+    if(equipped) tag='<span class="ctag" style="color:#7ee081">✓ EN USO</span>';
+    else if(owned) tag='<span class="ctag" style="color:#9fb4d8">comprado</span>';
+    else tag=`<span class="ctag" style="color:#ffd34d">🪙 ${c.price}</span>`;
+    h+=`<div class="${cls}">
+      <div class="carswatch" style="background:${body}"><div class="stripe" style="background:${c.accent}"></div></div>
+      <div class="cname">${c.name}</div>${tag}</div>`;
+  });
+  els.shopGrid.innerHTML=h;
+}
 
 function update(dt){
   // gamepads recién conectados pueden unirse en lobby
   if(state===STATE.LOBBY){
     if(anyEdge(['6'])){ openHiscores(STATE.LOBBY); return; }
     if(anyEdge(['8'])){ openNames(); return; }
+    if(anyEdge(['2'])){ openShop(); return; }
     lobbyJoin(); return;
+  }
+
+  if(state===STATE.SHOP){
+    if(anyEdge(['7'])){ shopNameIdx=(shopNameIdx+1)%roster.length; shopSel=0; renderShop(); }
+    if(anyEdge(['9'])){ shopNameIdx=(shopNameIdx-1+roster.length)%roster.length; shopSel=0; renderShop(); }
+    if(anyEdge(['4','ArrowLeft','a','A'])){ shopSel=(shopSel-1+CARS.length)%CARS.length; renderShop(); }
+    if(anyEdge(['6','ArrowRight','d','D'])){ shopSel=(shopSel+1)%CARS.length; renderShop(); }
+    if(anyEdge(['5','Enter','NumpadEnter'])) shopBuyOrEquip();
+    if(anyEdge(['2'])) closeShop();
+    return;
   }
 
   if(state===STATE.NAMES){ return; }   // todo se maneja con las casillas y el botón
@@ -757,6 +875,14 @@ function endRace(){
   newLapRec  = (bestLapThis  && (!prevLap  || bestLapThis.time < prevLap.time))  ? bestLapThis  : null;
   newRaceRec = (bestRaceThis && (!prevRace || bestRaceThis.time< prevRace.time)) ? bestRaceThis : null;
 
+  // Monedas: por puesto (10/8/6/4/2…) + bonus si batió récord. Se guardan por nombre.
+  for(const p of players){
+    let coins = Math.max(2, 12 - p.finishOrder*2);
+    if((newLapRec&&newLapRec.name===p.name) || (newRaceRec&&newRaceRec.name===p.name)) coins += 5;
+    p.lastCoins = coins;
+    addCoins(p.name, coins);
+  }
+
   state=STATE.RESULTS;
   renderResults();
   els.results.classList.remove('hidden');
@@ -785,13 +911,14 @@ function renderResults(){
     const who=(newRaceRec||newLapRec).name;
     banner=`<div class="recbanner">🏆 ¡NUEVO RÉCORD! ${who} — ${parts.join(' · ')}</div>`;
   }
-  let h=banner+'<table><tr><th>Pos</th><th>Coche</th><th>Tiempo total</th><th>Mejor vuelta</th><th>Puntos</th></tr>';
+  let h=banner+'<table><tr><th>Pos</th><th>Coche</th><th>Tiempo total</th><th>Mejor vuelta</th><th>Puntos</th><th>🪙</th></tr>';
   for(const p of ranked){
     h+=`<tr><td class="pos">${p.finishOrder}º</td>
-      <td><span class="row-swatch" style="background:${p.pal.body}"></span> ${p.name}</td>
+      <td><span class="row-swatch" style="background:${p.body}"></span> ${p.name}</td>
       <td>${p.finishTime?p.finishTime.toFixed(2)+'s':'—'}</td>
       <td>${p.bestLap?p.bestLap.toFixed(2)+'s':'—'}</td>
-      <td>+${p.lastPts}</td></tr>`;
+      <td>+${p.lastPts}</td>
+      <td style="color:#ffd34d">+${p.lastCoins||0}</td></tr>`;
   }
   h+='</table>';
   // récords actuales
@@ -843,7 +970,8 @@ function drawCar(p){
   const c=p.car; ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.angle);
   if(p.boostT>0){ ctx.fillStyle='rgba(255,180,60,.85)'; ctx.beginPath(); ctx.moveTo(-17,-6); ctx.lineTo(-30-Math.random()*8,0); ctx.lineTo(-17,6); ctx.fill(); }
   ctx.fillStyle='rgba(0,0,0,.3)'; rr(-16,-9,34,20,5); ctx.fill();
-  ctx.fillStyle=p.pal.body; rr(-17,-11,34,22,5); ctx.fill();
+  ctx.fillStyle=p.body; rr(-17,-11,34,22,5); ctx.fill();
+  ctx.fillStyle=p.accent; ctx.fillRect(-6,-11,5,22);     // franja del color de acento
   ctx.fillStyle='#bfe3ff'; ctx.fillRect(1,-8,9,16);
   ctx.fillStyle='#111'; ctx.fillRect(-13,-13,8,4); ctx.fillRect(-13,9,8,4); ctx.fillRect(8,-13,8,4); ctx.fillRect(8,9,8,4);
   ctx.restore();
@@ -857,7 +985,7 @@ function drawHUD(){
   ctx.textAlign='left'; ctx.font='bold 22px system-ui';
   let y=14;
   ranked.forEach((p,i)=>{
-    ctx.fillStyle=p.pal.body; ctx.fillRect(12,y,22,22);
+    ctx.fillStyle=p.body; ctx.fillRect(12,y,22,22);
     ctx.fillStyle='#fff';
     const lapTxt = p.finished?'META':('V'+Math.min(p.lap,TOTAL_LAPS)+'/'+TOTAL_LAPS);
     ctx.fillText(`${i+1}. ${p.name}  ${lapTxt}`, 42, y+18);
