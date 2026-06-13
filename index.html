@@ -54,9 +54,10 @@
   <p>Pantalla fija, todos en el mismo circuito. <span class="hint">Pulsa un botón para unirte.</span></p>
   <div id="playerCards" class="players"></div>
   <p class="small">
-    <b>Mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ girar · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · <b>5</b> (u OK) unirse → pulsa <b>5</b> otra vez para empezar<br>
-    <b>Gamepads:</b> stick o cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · pulsa <b>A</b> para unirte<br>
-    <span style="opacity:.6">(las flechas también valen en teclado/PC)</span>
+    <b>Jugador 1 — mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · une con <b>5</b><br>
+    <b>Jugador 2 — 2º teclado (LETRAS):</b> <b>A</b> ◀ / <b>D</b> ▶ · <b>W</b> acelerar · <b>S</b> frenar · <b>F</b> aceite · <b>Q</b> turbo · une con <b>G</b><br>
+    <b>Gamepads:</b> stick/cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · une con <b>A</b><br>
+    <span style="opacity:.7">Empezar la carrera: <b>0</b> (o OK / Start del gamepad)</span>
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
@@ -140,6 +141,17 @@ const PALETTE = [
   {name:'Morado',  body:'#a85ce8', glow:'#cf9bff'},
 ];
 
+// Perfiles de teclado: cada uno usa TECLAS DISTINTAS para que dos jugadores
+// puedan compartir el mismo "teclado" (mando TV con números + 2º teclado con letras).
+const KB_PROFILES = [
+  { label:'Números (mando TV): 4/6 · 5 aceite · 0 turbo', join:['5'],
+    left:['4','ArrowLeft'], right:['6','ArrowRight'], accel:['8','ArrowUp'],
+    brake:['2','ArrowDown'], oil:['5','Enter'], boost:['0'] },
+  { label:'Letras (2º teclado): A/D · F aceite · Q turbo', join:['g','G'],
+    left:['a','A'], right:['d','D'], accel:['w','W'],
+    brake:['s','S'], oil:['f','F'], boost:['q','Q'] },
+];
+
 //==================================================================
 // Entrada: teclado (1 jugador) + gamepads (N jugadores)
 //==================================================================
@@ -169,6 +181,8 @@ window.addEventListener('keydown', e=>{
 });
 window.addEventListener('keyup', e=>{ for(const n of keyNames(e)) keys[n]=false; });
 function consumeKey(code){ if(keyEdge[code]){ keyEdge[code]=false; return true;} return false; }
+function anyDown(arr){ return arr.some(k=>keys[k]); }
+function anyEdge(arr){ let hit=false; for(const k of arr){ if(keyEdge[k]){ keyEdge[k]=false; hit=true; } } return hit; }
 
 const padPrev = {}; // index -> previous buttons pressed bools
 function padList(){ return (navigator.getGamepads ? navigator.getGamepads() : []); }
@@ -185,14 +199,12 @@ function padEdge(gp,i){
 function readInput(p){
   const out = {steer:0, throttle:0, oil:false, boost:false};
   if(p.src.type==='kb'){
-    const L = keys['ArrowLeft'] || keys['4'];
-    const R = keys['ArrowRight']|| keys['6'];
-    const U = keys['ArrowUp']   || keys['8'];
-    const D = keys['ArrowDown'] || keys['2'];
+    const pr = KB_PROFILES[p.src.profile];
+    const L=anyDown(pr.left), R=anyDown(pr.right), U=anyDown(pr.accel), D=anyDown(pr.brake);
     out.steer = (R?1:0) - (L?1:0);
     out.throttle = (U?1:0) - (D?1:0);
-    out.oil = consumeKey('Enter') || consumeKey('Space') || consumeKey('NumpadEnter') || consumeKey('5');
-    out.boost = keys['KeyB'] || keys['0'];
+    out.oil = anyEdge(pr.oil);
+    out.boost = anyDown(pr.boost);
     if(autoAccel && !D) out.throttle = 1;
   } else {
     const gp = padList()[p.src.index];
@@ -263,18 +275,19 @@ function newPlayer(src){
     finished:false, finishOrder:0, progress:0, spin:0, boostT:0, oilCd:0, boostCd:0,
   };
 }
-function hasKbPlayer(){ return players.some(p=>p.src.type==='kb'); }
+function hasKbProfile(i){ return players.some(p=>p.src.type==='kb'&&p.src.profile===i); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
 
 function lobbyJoin(){
   let start=false;
   const pads = padList();
 
-  // teclado / mando TV (OK/Enter o número 5): 1ª pulsación une, 2ª empieza
-  if(consumeKey('Enter')||consumeKey('Space')||consumeKey('NumpadEnter')||consumeKey('5')){
-    if(!hasKbPlayer() && players.length<5) players.push(newPlayer({type:'kb'}));
-    else if(players.length>=1) start=true;
-  }
+  // teclados: cada perfil se une con SU tecla (5 = mando TV, G = 2º teclado)
+  KB_PROFILES.forEach((pr,idx)=>{
+    if(anyEdge(pr.join) && !hasKbProfile(idx) && players.length<5){
+      players.push(newPlayer({type:'kb', profile:idx}));
+    }
+  });
   // gamepads: A o Start para unirse
   for(let i=0;i<pads.length;i++){
     const gp = pads[i]; if(!gp) continue;
@@ -282,10 +295,10 @@ function lobbyJoin(){
       players.push(newPlayer({type:'pad', index:i}));
     }
   }
-  // auto-acelerar: tecla A o número 1
-  if(consumeKey('KeyA')||consumeKey('1')){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
-  // empezar: tecla S, número 0, o Start de un gamepad ya unido
-  if(consumeKey('KeyS')||consumeKey('0')) start=true;
+  // auto-acelerar: número 1
+  if(anyEdge(['1'])){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
+  // empezar: número 0, Enter/OK, o Start de un gamepad ya unido
+  if(anyEdge(['0','Enter'])) start=true;
   for(const p of players){ if(p.src.type==='pad'){ const gp=pads[p.src.index]; if(gp&&padEdge(gp,9)) start=true; } }
   if(start && players.length>=1) beginCountdown();
 }
@@ -297,7 +310,7 @@ function renderLobby(){
     if(p){
       html+=`<div class="pcard"><div class="dot" style="background:${p.pal.body}"></div>
         <div class="who">${p.name}</div>
-        <div class="src">${p.src.type==='kb'?'Mando TV / teclado':'Gamepad '+(p.src.index+1)}</div></div>`;
+        <div class="src">${p.src.type==='kb'?KB_PROFILES[p.src.profile].label:'Gamepad '+(p.src.index+1)}</div></div>`;
     } else {
       html+=`<div class="pcard empty"><div class="dot" style="background:#2a3140"></div>
         <div class="who">Libre</div><div class="src">Pulsa un botón</div></div>`;
