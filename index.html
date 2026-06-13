@@ -54,10 +54,11 @@
   <p>Pantalla fija, todos en el mismo circuito. <span class="hint">Pulsa un botón para unirte.</span></p>
   <div id="playerCards" class="players"></div>
   <p class="small">
-    <b>Mando TV / teclado:</b> ◀ ▶ girar · ▲ acelerar · ▼ frenar · <b>OK/Enter</b> aceite · <b>B</b> turbo<br>
-    <b>Gamepads:</b> stick o cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · pulsa <b>A</b> para unirte
+    <b>Mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ girar · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · <b>OK</b> unirse y empezar<br>
+    <b>Gamepads:</b> stick o cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · pulsa <b>A</b> para unirte<br>
+    <span style="opacity:.6">(las flechas también valen en teclado/PC)</span>
   </p>
-  <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(tecla A en teclado para cambiar)</span></div>
+  <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
@@ -69,7 +70,7 @@
   <div id="resultTable"></div>
   <h2>Campeonato</h2>
   <div id="champTable"></div>
-  <p class="badge" id="resultHint">OK / A → otra carrera · Mantén Atrás/Start 1s → al lobby</p>
+  <p class="badge" id="resultHint">OK / 5 / A → otra carrera · 1 → volver al lobby</p>
 </div>
 
 <script>
@@ -145,13 +146,13 @@ const PALETTE = [
 const keys = {};
 const keyEdge = {}; // rising edge
 let lastKey = '—';
+function markDown(k){ if(k==null) return; if(!keys[k]) keyEdge[k]=true; keys[k]=true; }
 window.addEventListener('keydown', e=>{
   lastKey = (e.code||'?') + (e.key && e.key!==e.code ? ' ('+e.key+')' : '');
-  if(!keys[e.code]) keyEdge[e.code]=true;
-  keys[e.code]=true;
+  markDown(e.code); markDown(e.key);   // registramos por código Y por carácter ('4','5'…)
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Space'].includes(e.code)) e.preventDefault();
 });
-window.addEventListener('keyup',   e=>{ keys[e.code]=false; });
+window.addEventListener('keyup', e=>{ keys[e.code]=false; if(e.key!=null) keys[e.key]=false; });
 function consumeKey(code){ if(keyEdge[code]){ keyEdge[code]=false; return true;} return false; }
 
 const padPrev = {}; // index -> previous buttons pressed bools
@@ -169,11 +170,15 @@ function padEdge(gp,i){
 function readInput(p){
   const out = {steer:0, throttle:0, oil:false, boost:false};
   if(p.src.type==='kb'){
-    out.steer = (keys['ArrowRight']?1:0) - (keys['ArrowLeft']?1:0);
-    out.throttle = (keys['ArrowUp']?1:0) - (keys['ArrowDown']?1:0);
-    out.oil = consumeKey('Enter') || consumeKey('Space') || consumeKey('NumpadEnter');
-    out.boost = keys['KeyB'];
-    if(autoAccel && !keys['ArrowDown']) out.throttle = 1;
+    const L = keys['ArrowLeft'] || keys['4'];
+    const R = keys['ArrowRight']|| keys['6'];
+    const U = keys['ArrowUp']   || keys['8'];
+    const D = keys['ArrowDown'] || keys['2'];
+    out.steer = (R?1:0) - (L?1:0);
+    out.throttle = (U?1:0) - (D?1:0);
+    out.oil = consumeKey('Enter') || consumeKey('Space') || consumeKey('NumpadEnter') || consumeKey('5');
+    out.boost = keys['KeyB'] || keys['0'];
+    if(autoAccel && !D) out.throttle = 1;
   } else {
     const gp = padList()[p.src.index];
     if(gp){
@@ -247,24 +252,25 @@ function hasKbPlayer(){ return players.some(p=>p.src.type==='kb'); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
 
 function lobbyJoin(){
-  // teclado
-  if(!hasKbPlayer() && players.length<5 && (consumeKey('Enter')||consumeKey('Space')||consumeKey('NumpadEnter'))){
-    players.push(newPlayer({type:'kb'}));
-  }
-  // gamepads
+  let start=false;
   const pads = padList();
+
+  // teclado / mando TV (OK/Enter o número 5): 1ª pulsación une, 2ª empieza
+  if(consumeKey('Enter')||consumeKey('Space')||consumeKey('NumpadEnter')||consumeKey('5')){
+    if(!hasKbPlayer() && players.length<5) players.push(newPlayer({type:'kb'}));
+    else if(players.length>=1) start=true;
+  }
+  // gamepads: A o Start para unirse
   for(let i=0;i<pads.length;i++){
     const gp = pads[i]; if(!gp) continue;
-    const joinPressed = padEdge(gp,0)||padEdge(gp,9); // A o Start
-    if(joinPressed && !hasPadPlayer(i) && players.length<5){
+    if((padEdge(gp,0)||padEdge(gp,9)) && !hasPadPlayer(i) && players.length<5){
       players.push(newPlayer({type:'pad', index:i}));
     }
   }
-  // toggle auto-acelerar
-  if(consumeKey('KeyA')){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
-  // empezar: tecla S (teclado) o Start de cualquier gamepad ya unido
-  let start=false;
-  if(consumeKey('KeyS')) start=true;
+  // auto-acelerar: tecla A o número 1
+  if(consumeKey('KeyA')||consumeKey('1')){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
+  // empezar: tecla S, número 0, o Start de un gamepad ya unido
+  if(consumeKey('KeyS')||consumeKey('0')) start=true;
   for(const p of players){ if(p.src.type==='pad'){ const gp=pads[p.src.index]; if(gp&&padEdge(gp,9)) start=true; } }
   if(start && players.length>=1) beginCountdown();
 }
@@ -442,10 +448,10 @@ function update(dt){
   if(state===STATE.RESULTS){
     // OK/A -> otra carrera ; volver al lobby con S
     let again=false;
-    if(consumeKey('Enter')||consumeKey('Space')||consumeKey('NumpadEnter')) again=true;
+    if(consumeKey('Enter')||consumeKey('Space')||consumeKey('NumpadEnter')||consumeKey('5')) again=true;
     const pads=padList();
     for(const p of players) if(p.src.type==='pad'){ const gp=pads[p.src.index]; if(gp&&padEdge(gp,0)) again=true; }
-    if(consumeKey('KeyS')){ // al lobby (reconfigurar jugadores)
+    if(consumeKey('KeyS')||consumeKey('1')){ // al lobby (reconfigurar jugadores)
       state=STATE.LOBBY; els.results.classList.add('hidden'); els.lobby.classList.remove('hidden');
       players=[]; renderLapRecord();
       return;
