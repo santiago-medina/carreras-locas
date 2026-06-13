@@ -86,7 +86,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v16</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v17</div>
 </div>
 
 <!-- EDITOR DE NOMBRES -->
@@ -353,6 +353,13 @@ const DEFAULT_NAMES = ['Rojo','Azul','Verde','Amarillo','Morado'];
 function getRoster(){ try{ const r=JSON.parse(localStorage.getItem(LS_NAMES)); return (Array.isArray(r)&&r.length)?r:DEFAULT_NAMES.slice(); }catch(e){ return DEFAULT_NAMES.slice(); } }
 function setRoster(r){ try{ localStorage.setItem(LS_NAMES, JSON.stringify(r)); }catch(e){} }
 let roster = getRoster();
+
+// Elección de nombre recordada por mando (persiste al refrescar / salir del juego)
+const LS_PICK = 'carGamePick';
+function loadPick(){ try{ return JSON.parse(localStorage.getItem(LS_PICK))||{}; }catch(e){ return {}; } }
+function savePick(p){ try{ localStorage.setItem(LS_PICK, JSON.stringify(p)); }catch(e){} }
+function sourceKey(src){ return src.type==='kb' ? 'kb'+src.profile : 'pad'+src.index; }
+let picks = loadPick();
 const TOP_N = 10;
 function loadMap(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
 function saveMap(k,m){ try{ localStorage.setItem(k, JSON.stringify(m)); }catch(e){} }
@@ -384,7 +391,9 @@ function renderLapRecord(){
 function newPlayer(src){
   const idx = players.length;
   const pal = PALETTE[idx % PALETTE.length];
-  const nameIdx = idx % roster.length;
+  let nameIdx = idx % roster.length;
+  const saved = picks[sourceKey(src)];        // restaurar la última elección de este mando
+  if(saved){ const j=roster.indexOf(saved); if(j>=0) nameIdx=j; }
   return {
     id: idx, src, pal,
     nameIdx, name: roster[nameIdx],            // nombre elegido del roster (gira ◀▶ en lobby)
@@ -432,7 +441,11 @@ function lobbyJoin(){
   // elegir nombre: cada jugador gira ◀▶ para recorrer el roster
   for(const p of players){
     const d=nameDirEdge(p);
-    if(d){ p.nameIdx=((p.nameIdx+d)%roster.length+roster.length)%roster.length; p.name=roster[p.nameIdx]; }
+    if(d){
+      p.nameIdx=((p.nameIdx+d)%roster.length+roster.length)%roster.length;
+      p.name=roster[p.nameIdx];
+      picks[sourceKey(p.src)]=p.name; savePick(picks);   // recordar la elección
+    }
   }
   // auto-acelerar: número 1
   if(anyEdge(['1'])){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
