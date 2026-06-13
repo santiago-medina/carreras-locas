@@ -71,10 +71,21 @@
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
-  <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span></p>
+  <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v13</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v14</div>
+</div>
+
+<!-- HI-SCORES -->
+<div id="hiscores" class="panel hidden">
+  <h1>🏆 Hi-Scores</h1>
+  <h2>Circuito: <span id="hsTrack" style="color:#ffd34d">Clásico</span> <span class="small">(cambia con 7 ▸ / 9 ◂)</span></h2>
+  <div style="display:flex;gap:6vw;flex-wrap:wrap;justify-content:center;align-items:flex-start">
+    <div><h2>⏱ Carrera completa</h2><div id="hsRace"></div></div>
+    <div><h2>🏁 Vuelta rápida</h2><div id="hsLap"></div></div>
+  </div>
+  <p class="badge">OK / 5 / 6 → volver al lobby</p>
 </div>
 
 <!-- COUNTDOWN / RESULTS use canvas; RESULTS panel below -->
@@ -83,7 +94,7 @@
   <div id="resultTable"></div>
   <h2>Campeonato</h2>
   <div id="champTable"></div>
-  <p class="badge" id="resultHint">OK / 5 / A → otra carrera · 1 → volver al lobby</p>
+  <p class="badge" id="resultHint">OK / 5 / A → otra carrera · 6 → Hi-Scores · 1 → al lobby</p>
 </div>
 
 <script>
@@ -278,7 +289,7 @@ function readInput(p){
 //==================================================================
 // Estado de juego
 //==================================================================
-const STATE = { LOBBY:0, COUNTDOWN:1, RACE:2, RESULTS:3 };
+const STATE = { LOBBY:0, COUNTDOWN:1, RACE:2, RESULTS:3, HISCORES:4 };
 let state = STATE.LOBBY;
 let players = [];          // persistente entre carreras (campeonato)
 let oils = [];             // {x,y,r,life}
@@ -286,6 +297,7 @@ let boostPads = [];        // decorativo/funcional
 let countdown = 0, raceClock = 0, leaderFinishTimer = -1;
 let autoAccel = true;
 let newLapRec = null, newRaceRec = null;   // récords batidos en la carrera actual
+let hsFrom = STATE.LOBBY;                   // desde dónde se abrió Hi-Scores
 
 const els = {
   lobby: document.getElementById('lobby'),
@@ -298,21 +310,33 @@ const els = {
   trackName: document.getElementById('trackName'),
   resultTable: document.getElementById('resultTable'),
   champTable: document.getElementById('champTable'),
+  hiscores: document.getElementById('hiscores'),
+  hsTrack: document.getElementById('hsTrack'),
+  hsRace: document.getElementById('hsRace'),
+  hsLap: document.getElementById('hsLap'),
 };
 
 //==================================================================
 // Persistencia (récords / campeonato)
 //==================================================================
-const LS_LAP = 'carGameBestLap';
-const LS_RACE = 'carGameBestRace';
+const LS_LAP = 'carGameLapList';    // Top-10 de vueltas rápidas por circuito
+const LS_RACE = 'carGameRaceList';  // Top-10 de tiempos de carrera por circuito
 const LS_CHAMP = 'carGameChamp';
+const TOP_N = 10;
 function loadMap(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
 function saveMap(k,m){ try{ localStorage.setItem(k, JSON.stringify(m)); }catch(e){} }
-function trackKey(){ return TRACKS[trackIdx].name; }   // récords separados por circuito
-function getBestLap(){ return loadMap(LS_LAP)[trackKey()]||null; }
-function setBestLap(v){ const m=loadMap(LS_LAP); m[trackKey()]=v; saveMap(LS_LAP,m); }
-function getBestRace(){ return loadMap(LS_RACE)[trackKey()]||null; }
-function setBestRace(v){ const m=loadMap(LS_RACE); m[trackKey()]=v; saveMap(LS_RACE,m); }
+function trackKey(){ return TRACKS[trackIdx].name; }   // listas separadas por circuito
+function getLapList(){ return loadMap(LS_LAP)[trackKey()] || []; }
+function getRaceList(){ return loadMap(LS_RACE)[trackKey()] || []; }
+function addScore(k,name,time){
+  const m=loadMap(k); const l=m[trackKey()]||[];
+  l.push({name, time}); l.sort((a,b)=>a.time-b.time);
+  m[trackKey()]=l.slice(0,TOP_N); saveMap(k,m);
+}
+function addLapScore(name,time){ addScore(LS_LAP, name, time); }
+function addRaceScore(name,time){ addScore(LS_RACE, name, time); }
+function getBestLap(){ return getLapList()[0] || null; }   // nº1 = récord
+function getBestRace(){ return getRaceList()[0] || null; }
 function loadChamp(){ try{ return JSON.parse(localStorage.getItem(LS_CHAMP))||{}; }catch(e){ return {}; } }
 function saveChamp(c){ try{ localStorage.setItem(LS_CHAMP, JSON.stringify(c)); }catch(e){} }
 
@@ -514,8 +538,6 @@ function stepCar(p, dt){
       const lapTime=raceClock-p.lapStart;
       if(lapTime>2){
         if(p.bestLap===null||lapTime<p.bestLap) p.bestLap=lapTime;
-        const rec=getBestLap();
-        if(!rec || lapTime<rec.time){ setBestLap({time:lapTime, name:p.name}); newLapRec={time:lapTime, name:p.name}; }
         p.lapStart=raceClock; p.checkpoint=false; p.lap++;
         if(p.lap>TOTAL_LAPS) finishPlayer(p);
       }
@@ -527,9 +549,6 @@ function finishPlayer(p){
   p.finished=true;
   p.finishTime = raceClock;                       // tiempo total de las 3 vueltas
   p.finishOrder = players.filter(q=>q.finished).length;
-  // récord de carrera completa (mejor tiempo en terminar)
-  const rec=getBestRace();
-  if(!rec || p.finishTime<rec.time){ setBestRace({time:p.finishTime, name:p.name}); newRaceRec={time:p.finishTime, name:p.name}; }
   if(leaderFinishTimer<0) leaderFinishTimer=20;   // DNF tras 20s del líder
 }
 
@@ -548,9 +567,33 @@ function carCollisions(){
 //==================================================================
 // Bucle de actualización
 //==================================================================
+function openHiscores(from){
+  hsFrom=from; state=STATE.HISCORES;
+  els.lobby.classList.add('hidden'); els.results.classList.add('hidden');
+  els.hiscores.classList.remove('hidden'); renderHiscores();
+}
+function closeHiscores(){
+  els.hiscores.classList.add('hidden');
+  if(hsFrom===STATE.RESULTS) players=[];   // venir de una carrera => lobby limpio
+  state=STATE.LOBBY; els.lobby.classList.remove('hidden'); renderLapRecord();
+}
+
 function update(dt){
   // gamepads recién conectados pueden unirse en lobby
-  if(state===STATE.LOBBY){ lobbyJoin(); return; }
+  if(state===STATE.LOBBY){
+    if(anyEdge(['6'])){ openHiscores(STATE.LOBBY); return; }
+    lobbyJoin(); return;
+  }
+
+  if(state===STATE.HISCORES){
+    if(anyEdge(['7'])){ setTrack(trackIdx+1); renderHiscores(); }
+    if(anyEdge(['9'])){ setTrack(trackIdx-1); renderHiscores(); }
+    let back=anyEdge(['6','5','Enter','NumpadEnter','Space']);
+    const pads=padList();
+    for(const p of players) if(p.src.type==='pad'){ const gp=pads[p.src.index]; if(gp&&padEdge(gp,0)) back=true; }
+    if(back) closeHiscores();
+    return;
+  }
 
   if(state===STATE.COUNTDOWN){
     countdown-=dt;
@@ -574,6 +617,7 @@ function update(dt){
   }
 
   if(state===STATE.RESULTS){
+    if(consumeKey('6')){ openHiscores(STATE.RESULTS); return; }
     // OK/A -> otra carrera ; volver al lobby con S
     let again=false;
     if(consumeKey('Enter')||consumeKey('Space')||consumeKey('NumpadEnter')||consumeKey('5')) again=true;
@@ -604,9 +648,38 @@ function endRace(){
     champ[p.name]=(champ[p.name]||0)+pts;
   }
   saveChamp(champ);
+
+  // Hi-Scores del circuito: ¿se bate el nº1 anterior? (para el cartel) y guardar.
+  const prevLap=getBestLap(), prevRace=getBestRace();
+  let bestLapThis=null, bestRaceThis=null;
+  for(const p of players){
+    if(p.bestLap!=null){
+      addLapScore(p.name, p.bestLap);
+      if(!bestLapThis || p.bestLap<bestLapThis.time) bestLapThis={name:p.name, time:p.bestLap};
+    }
+    if(p.finished && p.finishTime){
+      addRaceScore(p.name, p.finishTime);
+      if(!bestRaceThis || p.finishTime<bestRaceThis.time) bestRaceThis={name:p.name, time:p.finishTime};
+    }
+  }
+  newLapRec  = (bestLapThis  && (!prevLap  || bestLapThis.time < prevLap.time))  ? bestLapThis  : null;
+  newRaceRec = (bestRaceThis && (!prevRace || bestRaceThis.time< prevRace.time)) ? bestRaceThis : null;
+
   state=STATE.RESULTS;
   renderResults();
   els.results.classList.remove('hidden');
+}
+
+function renderHiscores(){
+  els.hsTrack.textContent = TRACKS[trackIdx].name;
+  const fmt=(list)=>{
+    if(!list.length) return '<p class="small">— aún sin marcas —</p>';
+    let h='<table>';
+    list.forEach((e,i)=>{ h+=`<tr><td class="pos">${i+1}</td><td>${e.name}</td><td>${e.time.toFixed(2)}s</td></tr>`; });
+    return h+'</table>';
+  };
+  els.hsRace.innerHTML = fmt(getRaceList());
+  els.hsLap.innerHTML  = fmt(getLapList());
 }
 
 function renderResults(){
