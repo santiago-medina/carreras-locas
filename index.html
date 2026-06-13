@@ -97,7 +97,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v23</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v24</div>
 </div>
 
 <!-- TIENDA -->
@@ -439,6 +439,22 @@ function addCoins(name, n){ const m=loadMap(LS_WALLET); m[name]=(m[name]||0)+n; 
 function getGarage(name){ const g=loadMap(LS_GARAGE)[name]; return (g&&Array.isArray(g.owned)) ? g : {owned:[0], selected:0}; }
 function setGarage(name,g){ const m=loadMap(LS_GARAGE); m[name]=g; saveMap(LS_GARAGE,m); }
 function carStyleFor(name){ const sel=getGarage(name).selected; return sel ? carById(sel) : null; } // null = básico (color de jugador)
+
+// Siembra de datos: se aplica UNA sola vez (marca carGameSeed). Si se borra el
+// navegador, la marca también desaparece, así que estos valores REAPARECEN solos.
+const SEED_VERSION = 1;
+function applySeed(){
+  try{
+    if((+localStorage.getItem('carGameSeed')||0) >= SEED_VERSION) return;
+    // monedas iniciales
+    const w=loadMap(LS_WALLET); w['Rojo']=155; w['Morado']=40; saveMap(LS_WALLET,w);
+    // récord de vuelta rápida del circuito 'Clásico'
+    const lap=loadMap(LS_LAP); const l=lap['Clásico']||[];
+    l.push({name:'Juan', time:6.63}); l.sort((a,b)=>a.time-b.time); lap['Clásico']=l.slice(0,TOP_N); saveMap(LS_LAP,lap);
+    localStorage.setItem('carGameSeed', String(SEED_VERSION));
+  }catch(e){}
+}
+applySeed();
 
 function renderLapRecord(){
   const r = getBestLap();
