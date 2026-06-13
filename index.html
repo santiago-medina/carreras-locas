@@ -57,7 +57,7 @@
     <b>Jugador 1 — mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · une con <b>5</b><br>
     <b>Jugador 2 — 2º teclado (LETRAS):</b> <b>A</b> ◀ / <b>D</b> ▶ · <b>W</b> acelerar · <b>S</b> frenar · <b>F</b> aceite · <b>Q</b> turbo · une con <b>G</b><br>
     <b>Gamepads:</b> stick/cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · une con <b>A</b><br>
-    <span style="opacity:.7">Empezar la carrera: <b>0</b> (o OK / Start del gamepad)</span>
+    <span style="opacity:.7">Empezar la carrera: <b>0</b>, <b>S</b>, OK, Start del gamepad, o pulsa otra vez tu tecla de unirte (<b>5</b>/<b>G</b>)</span>
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
@@ -282,10 +282,12 @@ function lobbyJoin(){
   let start=false;
   const pads = padList();
 
-  // teclados: cada perfil se une con SU tecla (5 = mando TV, G = 2º teclado)
+  // teclados: cada perfil se une con SU tecla (5 = mando TV, G = 2º teclado).
+  // Si ya estás unido, pulsarla otra vez EMPIEZA la carrera.
   KB_PROFILES.forEach((pr,idx)=>{
-    if(anyEdge(pr.join) && !hasKbProfile(idx) && players.length<5){
-      players.push(newPlayer({type:'kb', profile:idx}));
+    if(anyEdge(pr.join)){
+      if(!hasKbProfile(idx) && players.length<5) players.push(newPlayer({type:'kb', profile:idx}));
+      else if(hasKbProfile(idx)) start=true;
     }
   });
   // gamepads: A o Start para unirse
@@ -297,8 +299,8 @@ function lobbyJoin(){
   }
   // auto-acelerar: número 1
   if(anyEdge(['1'])){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
-  // empezar: número 0, Enter/OK, o Start de un gamepad ya unido
-  if(anyEdge(['0','Enter'])) start=true;
+  // empezar: número 0, S, Enter/OK, o Start de un gamepad ya unido
+  if(anyEdge(['0','Enter','s','S'])) start=true;
   for(const p of players){ if(p.src.type==='pad'){ const gp=pads[p.src.index]; if(gp&&padEdge(gp,9)) start=true; } }
   if(start && players.length>=1) beginCountdown();
 }
