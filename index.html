@@ -46,6 +46,12 @@
   .row-swatch { width: 2.6vh; height: 2.6vh; border-radius: 50%; display: inline-block; vertical-align: middle; }
   .toggle { margin-top: 2vh; font-size: 2vh; }
   .toggle b { color: #7ee081; }
+  .recbanner {
+    display: inline-block; margin: 0 0 1.5vh; padding: 1.2vh 2.4vh; border-radius: 1.2vh;
+    background: #ffd34d; color: #11141c; font-weight: 800; font-size: 2.8vh;
+    box-shadow: 0 0 2.4vh rgba(255,211,77,.6); animation: recpulse 1s ease-in-out infinite;
+  }
+  @keyframes recpulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 </style>
 </head>
 <body>
@@ -66,7 +72,7 @@
   <p class="badge" id="startHint">Esperando jugadores…</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v11</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v12</div>
 </div>
 
 <!-- COUNTDOWN / RESULTS use canvas; RESULTS panel below -->
@@ -255,6 +261,7 @@ let oils = [];             // {x,y,r,life}
 let boostPads = [];        // decorativo/funcional
 let countdown = 0, raceClock = 0, leaderFinishTimer = -1;
 let autoAccel = true;
+let newLapRec = null, newRaceRec = null;   // récords batidos en la carrera actual
 
 const els = {
   lobby: document.getElementById('lobby'),
@@ -363,7 +370,7 @@ function renderLobby(){
 // Iniciar carrera
 //==================================================================
 function beginCountdown(){
-  oils=[]; raceClock=0; leaderFinishTimer=-1;
+  oils=[]; raceClock=0; leaderFinishTimer=-1; newLapRec=null; newRaceRec=null;
   // colocar coches en parrilla detrás de la meta
   const perp = START_DIR + Math.PI/2;
   players.forEach((p,i)=>{
@@ -476,7 +483,7 @@ function stepCar(p, dt){
       if(lapTime>2){
         if(p.bestLap===null||lapTime<p.bestLap) p.bestLap=lapTime;
         const rec=getBestLap();
-        if(!rec || lapTime<rec.time) setBestLap({time:lapTime, name:p.name});
+        if(!rec || lapTime<rec.time){ setBestLap({time:lapTime, name:p.name}); newLapRec={time:lapTime, name:p.name}; }
         p.lapStart=raceClock; p.checkpoint=false; p.lap++;
         if(p.lap>TOTAL_LAPS) finishPlayer(p);
       }
@@ -490,7 +497,7 @@ function finishPlayer(p){
   p.finishOrder = players.filter(q=>q.finished).length;
   // récord de carrera completa (mejor tiempo en terminar)
   const rec=getBestRace();
-  if(!rec || p.finishTime<rec.time) setBestRace({time:p.finishTime, name:p.name});
+  if(!rec || p.finishTime<rec.time){ setBestRace({time:p.finishTime, name:p.name}); newRaceRec={time:p.finishTime, name:p.name}; }
   if(leaderFinishTimer<0) leaderFinishTimer=20;   // DNF tras 20s del líder
 }
 
@@ -572,7 +579,16 @@ function endRace(){
 
 function renderResults(){
   const ranked=[...players].sort((a,b)=>a.finishOrder-b.finishOrder);
-  let h='<table><tr><th>Pos</th><th>Coche</th><th>Tiempo total</th><th>Mejor vuelta</th><th>Puntos</th></tr>';
+  // cartel de nuevo récord (si se batió alguno esta carrera)
+  let banner='';
+  if(newRaceRec || newLapRec){
+    const parts=[];
+    if(newRaceRec) parts.push(`carrera ${newRaceRec.time.toFixed(2)}s`);
+    if(newLapRec)  parts.push(`vuelta ${newLapRec.time.toFixed(2)}s`);
+    const who=(newRaceRec||newLapRec).name;
+    banner=`<div class="recbanner">🏆 ¡NUEVO RÉCORD! ${who} — ${parts.join(' · ')}</div>`;
+  }
+  let h=banner+'<table><tr><th>Pos</th><th>Coche</th><th>Tiempo total</th><th>Mejor vuelta</th><th>Puntos</th></tr>';
   for(const p of ranked){
     h+=`<tr><td class="pos">${p.finishOrder}º</td>
       <td><span class="row-swatch" style="background:${p.pal.body}"></span> ${p.name}</td>
@@ -581,6 +597,10 @@ function renderResults(){
       <td>+${p.lastPts}</td></tr>`;
   }
   h+='</table>';
+  // récords actuales
+  const bl=getBestLap(), br=getBestRace();
+  h+=`<p class="small" style="margin-top:1vh">🏁 Récord de vuelta: <b>${bl?bl.time.toFixed(2)+'s ('+bl.name+')':'—'}</b>`
+   + ` &nbsp;·&nbsp; Récord de carrera: <b>${br?br.time.toFixed(2)+'s ('+br.name+')':'—'}</b></p>`;
   els.resultTable.innerHTML=h;
 
   const champ=loadChamp();
