@@ -97,7 +97,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v20</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v21</div>
 </div>
 
 <!-- TIENDA -->
@@ -952,9 +952,16 @@ function strokeCenter(){
 }
 function drawTrack(){
   ctx.lineJoin='round'; ctx.lineCap='round';
-  ctx.strokeStyle='#d9b24a'; ctx.lineWidth=(TRACK_HW+9)*2; strokeCenter();   // borde arena claro
-  ctx.strokeStyle='#9c7340'; ctx.lineWidth=TRACK_HW*2; strokeCenter();       // tierra batida
-  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=4; ctx.setLineDash([22,26]); strokeCenter(); ctx.setLineDash([]);
+  // piano rojiblanco (rumble strip): base roja + bloques blancos por encima
+  ctx.strokeStyle='#c4382f'; ctx.lineWidth=(TRACK_HW+11)*2; strokeCenter();
+  ctx.lineCap='butt';
+  ctx.strokeStyle='#f2f4f8'; ctx.lineWidth=(TRACK_HW+11)*2; ctx.setLineDash([18,18]); strokeCenter(); ctx.setLineDash([]);
+  ctx.lineCap='round';
+  // borde blanco + asfalto gris
+  ctx.strokeStyle='#e9eef4'; ctx.lineWidth=TRACK_HW*2;     strokeCenter();   // línea de borde
+  ctx.strokeStyle='#41454d'; ctx.lineWidth=TRACK_HW*2-8;   strokeCenter();   // asfalto
+  // línea central discontinua
+  ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=3; ctx.setLineDash([24,28]); strokeCenter(); ctx.setLineDash([]);
   // meta a cuadros
   ctx.save();
   ctx.translate(START.x,START.y); ctx.rotate(START_DIR+Math.PI/2);
@@ -975,57 +982,79 @@ function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,
 function rrp(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
 // dibuja un coche centrado en el origen, mirando a +x (reutilizable en juego y tienda)
 function drawCarBody(g, shape, body, accent){
-  g.lineJoin='round';
-  const wh=(x,y,w,h)=>{ g.fillStyle='#111'; g.fillRect(x,y,w,h); };
+  g.lineJoin='round'; g.lineCap='round';
+  const OUT='rgba(0,0,0,.55)', GLASS='#9ed1f2';
+  // rueda con llanta
+  const wheels=(arr)=>{ for(const w of arr){ g.fillStyle='#101013'; g.fillRect(w[0],w[1],w[2],w[3]); g.fillStyle='#34343a'; g.fillRect(w[0]+1,w[1]+1,w[2]-2,w[3]-2); } };
+  const outline=()=>{ g.strokeStyle=OUT; g.lineWidth=1.4; g.stroke(); };
+  const heads=(x)=>{ g.fillStyle='#fff7c8'; g.fillRect(x,-8,2.5,3); g.fillRect(x,5,2.5,3); };
+  const tails=(x)=>{ g.fillStyle='#ff5446'; g.fillRect(x,-8.5,2.2,3); g.fillRect(x,5.5,2.2,3); };
+  const shine=(x,y,w,h)=>{ g.fillStyle='rgba(255,255,255,.18)'; g.fillRect(x,y,w,h); };
+
   if(shape==='deportivo'){
-    wh(-12,-13,8,4); wh(-12,9,8,4); wh(7,-13,8,4); wh(7,9,8,4);
-    g.fillStyle=body; g.beginPath(); g.moveTo(18,0); g.lineTo(7,-11); g.lineTo(-15,-11); g.quadraticCurveTo(-19,0,-15,11); g.lineTo(7,11); g.closePath(); g.fill();
-    g.fillStyle=accent; g.fillRect(-7,-11,5,22);
-    g.fillStyle='#bfe3ff'; g.beginPath(); g.moveTo(8,0); g.lineTo(0,-6); g.lineTo(0,6); g.closePath(); g.fill();
+    wheels([[-13,-13,8,4],[-13,9,8,4],[7,-13,9,4],[7,9,9,4]]);
+    g.beginPath(); g.moveTo(19,0); g.lineTo(10,-10); g.lineTo(-13,-11); g.quadraticCurveTo(-18,0,-13,11); g.lineTo(10,10); g.closePath();
+    g.fillStyle=body; g.fill(); outline();
+    g.fillStyle=accent; g.fillRect(-13,-3,26,2.4); g.fillRect(-13,0.6,26,2.4);  // doble franja
+    g.fillStyle=GLASS; g.beginPath(); g.moveTo(8,0); g.lineTo(-1,-7); g.lineTo(-9,-6); g.lineTo(-9,6); g.lineTo(-1,7); g.closePath(); g.fill();
+    g.fillStyle='#222'; g.fillRect(-15,-9,3,18);                                 // alerón trasero
+    heads(15); tails(-12); shine(-2,-9,9,3);
     return;
   }
   if(shape==='buggy'){
-    wh(-15,-15,11,6); wh(-15,9,11,6); wh(5,-15,11,6); wh(5,9,11,6);   // ruedas grandes
-    g.fillStyle=body; rrp(g,-13,-9,27,18,7); g.fill();
-    g.fillStyle=accent; g.fillRect(-4,-9,5,18);
-    g.fillStyle='#1b1b1b'; rrp(g,-3,-6,9,12,2); g.fill();             // jaula
+    wheels([[-15,-15,11,6],[-15,9,11,6],[5,-15,11,6],[5,9,11,6]]);               // ruedas todoterreno
+    rrp(g,-13,-9,27,18,7); g.fillStyle=body; g.fill(); outline();
+    g.fillStyle='#15151a'; rrp(g,-4,-7,11,14,3); g.fill();                        // jaula/cabina
+    g.fillStyle=accent; g.fillRect(-4,-7,11,2.4); g.fillRect(-4,4.6,11,2.4);
+    g.strokeStyle='#0c0c10'; g.lineWidth=1.2; g.beginPath(); g.moveTo(-4,0); g.lineTo(7,0); g.stroke(); // barra
+    heads(12);
     return;
   }
   if(shape==='camion'){
-    wh(-14,-14,9,5); wh(-14,9,9,5); wh(7,-14,9,5); wh(7,9,9,5);
-    g.fillStyle=body; rrp(g,-18,-12,30,24,4); g.fill();              // caja de carga
-    g.fillStyle='#2a2f3a'; rrp(g,9,-11,9,22,3); g.fill();            // cabina
-    g.fillStyle='#bfe3ff'; g.fillRect(15,-8,2,16);
-    g.fillStyle=accent; g.fillRect(-12,-12,5,24);
+    wheels([[-15,-14,9,5],[-15,9,9,5],[8,-14,9,5],[8,9,9,5]]);
+    rrp(g,-19,-12,28,24,4); g.fillStyle=body; g.fill(); outline();               // caja
+    g.fillStyle='rgba(0,0,0,.25)'; for(let i=-15;i<8;i+=6) g.fillRect(i,-12,1.6,24); // tablas de la caja
+    g.fillStyle='#3a3f49'; rrp(g,9,-11,10,22,3); g.fill(); outline();            // cabina
+    g.fillStyle=GLASS; g.fillRect(15,-8,2.4,16);
+    g.fillStyle=accent; g.fillRect(9,-11,10,2.4);
+    heads(17); tails(-19);
     return;
   }
   if(shape==='furgo'){
-    wh(-13,-14,8,5); wh(-13,9,8,5); wh(8,-14,8,5); wh(8,9,8,5);
-    g.fillStyle=body; rrp(g,-19,-12,38,24,5); g.fill();
-    g.fillStyle='#bfe3ff'; g.fillRect(10,-9,6,18);
-    g.fillStyle=accent; g.fillRect(-13,-12,5,24);
+    wheels([[-13,-14,8,5],[-13,9,8,5],[8,-14,8,5],[8,9,8,5]]);
+    rrp(g,-19,-12,38,24,6); g.fillStyle=body; g.fill(); outline();
+    g.fillStyle=GLASS; g.fillRect(10,-9,6,18);                                    // parabrisas
+    g.fillStyle='rgba(180,210,235,.7)'; g.fillRect(-2,-11.5,10,2); g.fillRect(-2,9.5,10,2); // ventanas laterales
+    g.fillStyle=accent; g.fillRect(-19,-2,38,4);                                  // franja lateral
+    heads(17); tails(-19);
     return;
   }
   if(shape==='f1'){
-    g.fillStyle='#222'; g.fillRect(14,-9,4,18); g.fillRect(-19,-8,4,16);  // alerones
-    wh(2,-15,9,5); wh(2,10,9,5); wh(-13,-14,9,5); wh(-13,9,9,5);          // ruedas descubiertas
-    g.fillStyle=body; rrp(g,-15,-6,30,12,6); g.fill();
-    g.fillStyle=accent; g.fillRect(-2,-6,5,12);
-    g.fillStyle='#111'; g.beginPath(); g.ellipse(-3,0,4,4,0,0,7); g.fill();
+    g.fillStyle='#1c1c1f'; rrp(g,13,-10,5,20,1.5); g.fill();                      // alerón delantero
+    rrp(g,-19,-9,5,18,1.5); g.fill();                                            // alerón trasero
+    wheels([[2,-15,9,5],[2,10,9,5],[-13,-14,9,5],[-13,9,9,5]]);                   // ruedas descubiertas
+    g.beginPath(); g.moveTo(15,0); g.lineTo(6,-4); g.lineTo(-14,-6); g.lineTo(-14,6); g.lineTo(6,4); g.closePath();
+    g.fillStyle=body; g.fill(); outline();                                        // monocasco puntiagudo
+    g.fillStyle=accent; g.fillRect(-14,-1.4,29,2.8);
+    g.fillStyle='#111'; g.beginPath(); g.ellipse(-4,0,3.4,3.4,0,0,Math.PI*2); g.fill(); // cockpit
+    g.fillStyle='#15151a'; g.fillRect(-13,-2,3,4);                                // toma de aire
     return;
   }
   if(shape==='bala'){
-    wh(-11,-12,7,4); wh(-11,8,7,4); wh(5,-12,7,4); wh(5,8,7,4);
-    g.fillStyle=body; g.beginPath(); g.ellipse(0,0,18,10,0,0,Math.PI*2); g.fill();
-    g.fillStyle=accent; g.fillRect(-5,-10,5,20);
-    g.fillStyle='#bfe3ff'; g.beginPath(); g.ellipse(4,0,5,5,0,0,Math.PI*2); g.fill();
+    wheels([[-11,-12,7,4],[-11,8,7,4],[5,-12,7,4],[5,8,7,4]]);
+    g.beginPath(); g.ellipse(0,0,18,10,0,0,Math.PI*2); g.fillStyle=body; g.fill(); outline();
+    g.fillStyle=accent; g.beginPath(); g.ellipse(0,0,18,3.2,0,0,Math.PI*2); g.fill(); // franja central
+    g.fillStyle=GLASS; g.beginPath(); g.ellipse(3,0,5,5,0,0,Math.PI*2); g.fill();
+    heads(14); tails(-15); shine(-6,-8,12,2.5);
     return;
   }
-  // básico
-  wh(-13,-13,8,4); wh(-13,9,8,4); wh(8,-13,8,4); wh(8,9,8,4);
-  g.fillStyle=body; rrp(g,-17,-11,34,22,5); g.fill();
-  g.fillStyle=accent; g.fillRect(-6,-11,5,22);
-  g.fillStyle='#bfe3ff'; g.fillRect(1,-8,9,16);
+  // básico (utilitario)
+  wheels([[-13,-13,8,4],[-13,9,8,4],[8,-13,8,4],[8,9,8,4]]);
+  rrp(g,-16,-11,33,22,6); g.fillStyle=body; g.fill(); outline();
+  g.fillStyle=GLASS; g.fillRect(2,-7,8,14);                                       // parabrisas
+  g.fillStyle='rgba(180,210,235,.65)'; g.fillRect(-8,-7,8,14);                    // luneta
+  g.fillStyle=accent; g.fillRect(-16,-2,33,4);
+  heads(15); tails(-16); shine(-6,-9,10,2.5);
 }
 function drawCar(p){
   const c=p.car; ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.angle);
@@ -1086,8 +1115,10 @@ function render(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle='#0d1016'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.setTransform(view.scale,0,0,view.scale,view.ox,view.oy);
-  // terreno off-road (tierra)
-  ctx.fillStyle='#6b4a2c'; ctx.fillRect(0,0,WORLD_W,WORLD_H);
+  // césped de circuito (verde con franjas de segado)
+  ctx.fillStyle='#2f7d3a'; ctx.fillRect(0,0,WORLD_W,WORLD_H);
+  ctx.fillStyle='rgba(255,255,255,.05)';
+  for(let y=0;y<WORLD_H;y+=64) ctx.fillRect(0,y,WORLD_W,32);
   drawTrack(); drawOils();
   if(state===STATE.RACE||state===STATE.COUNTDOWN||state===STATE.RESULTS){
     for(const p of players) if(p.car) drawCar(p);
