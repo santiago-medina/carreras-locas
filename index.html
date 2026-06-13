@@ -97,7 +97,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v22</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v23</div>
 </div>
 
 <!-- TIENDA -->
@@ -268,6 +268,9 @@ const CARS = [
   { id:9, name:'Bala Arcoíris',  price:500, shape:'bala',      body:'#9b59b6', accent:'#ffffff' },
 ];
 function carById(id){ return CARS.find(c=>c.id===id) || CARS[0]; }
+// precarga de las imágenes (todas apuntan hacia ARRIBA: -y)
+const carImages = {};
+CARS.forEach(c=>{ const im=new Image(); im.src='assets/cars/'+c.id+'.png'; carImages[c.id]=im; });
 
 // Perfiles de teclado: cada uno usa TECLAS DISTINTAS para que dos jugadores
 // puedan compartir el mismo "teclado" (mando TV con números + 2º teclado con letras).
@@ -456,7 +459,7 @@ function newPlayer(src){
   const p = {
     id: idx, src, pal,
     nameIdx, name: roster[nameIdx],            // nombre elegido del roster (gira ◀▶ en lobby)
-    body: pal.body, accent:'#bfe3ff', shape:'basico',   // coche (se ajusta al equipado)
+    body: pal.body, accent:'#bfe3ff', shape:'basico', carId:0,   // coche (se ajusta al equipado)
     assistWalls: src.type==='kb' && src.profile===1,  // el 2º teclado (Lenovo) lleva paredes
     points: 0,                 // campeonato acumulado
     // estado de carrera reiniciable:
@@ -472,6 +475,7 @@ function refreshPlayerCar(p){
   p.body = sty ? sty.body : p.pal.body;
   p.accent = sty ? sty.accent : '#bfe3ff';
   p.shape = sty ? sty.shape : 'basico';
+  p.carId = getGarage(p.name).selected;   // id del coche equipado (0 = básico)
 }
 function hasKbProfile(i){ return players.some(p=>p.src.type==='kb'&&p.src.profile===i); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
@@ -1050,10 +1054,19 @@ function drawCarBody(g, shape, body, accent){
   heads(15); tails(-16); shine(-6,-9,10,2.5);
 }
 function drawCar(p){
-  const c=p.car; ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.angle);
-  if(p.boostT>0){ ctx.fillStyle='rgba(255,180,60,.85)'; ctx.beginPath(); ctx.moveTo(-17,-6); ctx.lineTo(-30-Math.random()*8,0); ctx.lineTo(-17,6); ctx.fill(); }
-  ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0,0,19,12,0,0,Math.PI*2); ctx.fill();
-  drawCarBody(ctx, p.shape, p.body, p.accent);
+  const c=p.car; ctx.save(); ctx.translate(c.x,c.y);
+  // sombra (sin rotar)
+  ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0,0,20,13,0,0,Math.PI*2); ctx.fill();
+  // llama de turbo, detrás del coche (en el sentido de la marcha)
+  if(p.boostT>0){ ctx.save(); ctx.rotate(c.angle); ctx.fillStyle='rgba(255,180,60,.85)';
+    ctx.beginPath(); ctx.moveTo(-18,-6); ctx.lineTo(-32-Math.random()*8,0); ctx.lineTo(-18,6); ctx.fill(); ctx.restore(); }
+  const img=carImages[p.carId];
+  if(img && img.complete && img.naturalWidth){
+    // la imagen apunta hacia ARRIBA (-y); +PI/2 alinea su morro con el rumbo (+x)
+    ctx.save(); ctx.rotate(c.angle + Math.PI/2); const S=48; ctx.drawImage(img, -S/2, -S/2, S, S); ctx.restore();
+  } else {
+    ctx.save(); ctx.rotate(c.angle); drawCarBody(ctx, p.shape, p.body, p.accent); ctx.restore();
+  }
   ctx.restore();
   // etiqueta con el nombre elegido (con contorno para que se lea sobre la pista)
   ctx.font='bold 16px system-ui'; ctx.textAlign='center';
