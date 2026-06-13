@@ -60,6 +60,7 @@
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(tecla A en teclado para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span></p>
+  <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
 </div>
 
 <!-- COUNTDOWN / RESULTS use canvas; RESULTS panel below -->
@@ -143,7 +144,9 @@ const PALETTE = [
 //==================================================================
 const keys = {};
 const keyEdge = {}; // rising edge
+let lastKey = '—';
 window.addEventListener('keydown', e=>{
+  lastKey = (e.code||'?') + (e.key && e.key!==e.code ? ' ('+e.key+')' : '');
   if(!keys[e.code]) keyEdge[e.code]=true;
   keys[e.code]=true;
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Space'].includes(e.code)) e.preventDefault();
@@ -283,6 +286,12 @@ function renderLobby(){
   els.startHint.textContent = players.length>=1
     ? `${players.length} jugador${players.length>1?'es':''} — pulsa START (o tecla S) para empezar`
     : 'Esperando jugadores…';
+
+  // diagnóstico en vivo: ¿qué ve el navegador?
+  const pads=padList(); let nPads=0;
+  for(let i=0;i<pads.length;i++) if(pads[i]) nPads++;
+  const diag=document.getElementById('diag');
+  if(diag) diag.textContent = `Diagnóstico — Gamepads detectados: ${nPads} · Última tecla: ${lastKey}`;
 }
 
 //==================================================================
