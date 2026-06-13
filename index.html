@@ -54,7 +54,7 @@
   <p>Pantalla fija, todos en el mismo circuito. <span class="hint">Pulsa un botón para unirte.</span></p>
   <div id="playerCards" class="players"></div>
   <p class="small">
-    <b>Mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ girar · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · <b>OK</b> unirse y empezar<br>
+    <b>Mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ girar · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · <b>5</b> (u OK) unirse → pulsa <b>5</b> otra vez para empezar<br>
     <b>Gamepads:</b> stick o cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · pulsa <b>A</b> para unirte<br>
     <span style="opacity:.6">(las flechas también valen en teclado/PC)</span>
   </p>
@@ -147,12 +147,27 @@ const keys = {};
 const keyEdge = {}; // rising edge
 let lastKey = '—';
 function markDown(k){ if(k==null) return; if(!keys[k]) keyEdge[k]=true; keys[k]=true; }
+// Todos los "nombres" bajo los que registrar una tecla. Normaliza los dígitos
+// (carácter '5', Digit5, Numpad5 o keyCode 53/101) a un único '5', y OK→Enter.
+function keyNames(e){
+  const n=[];
+  if(e.code) n.push(e.code);
+  if(e.key!=null) n.push(e.key);
+  let d=null;
+  if(e.key && /^[0-9]$/.test(e.key)) d=e.key;
+  else if(e.code && /^(Digit|Numpad)[0-9]$/.test(e.code)) d=e.code.slice(-1);
+  else if(e.keyCode>=48 && e.keyCode<=57)  d=String(e.keyCode-48);
+  else if(e.keyCode>=96 && e.keyCode<=105) d=String(e.keyCode-96);
+  if(d!=null) n.push(d);
+  if(e.keyCode===13) n.push('Enter');
+  return n;
+}
 window.addEventListener('keydown', e=>{
-  lastKey = (e.code||'?') + (e.key && e.key!==e.code ? ' ('+e.key+')' : '');
-  markDown(e.code); markDown(e.key);   // registramos por código Y por carácter ('4','5'…)
+  lastKey = `${e.code||'?'}${e.key&&e.key!==e.code?' ('+e.key+')':''} #${e.keyCode}`;
+  for(const n of keyNames(e)) markDown(n);
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Space'].includes(e.code)) e.preventDefault();
 });
-window.addEventListener('keyup', e=>{ keys[e.code]=false; if(e.key!=null) keys[e.key]=false; });
+window.addEventListener('keyup', e=>{ for(const n of keyNames(e)) keys[n]=false; });
 function consumeKey(code){ if(keyEdge[code]){ keyEdge[code]=false; return true;} return false; }
 
 const padPrev = {}; // index -> previous buttons pressed bools
