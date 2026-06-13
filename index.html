@@ -53,6 +53,17 @@
     box-shadow: 0 0 2.4vh rgba(255,211,77,.6); animation: recpulse 1s ease-in-out infinite;
   }
   @keyframes recpulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  .nameedit { display:flex; flex-wrap:wrap; gap:1.6vh; justify-content:center; margin:2vh 0; }
+  .nameedit label { display:flex; flex-direction:column; align-items:flex-start; gap:.4vh; font-size:1.7vh; }
+  .nameedit input {
+    font-size:2.4vh; padding:1vh 1.4vh; border-radius:1vh; border:.3vh solid #2a3140;
+    background:#0f131c; color:#eef3fb; width:26vh; box-sizing:border-box;
+  }
+  .nameedit input:focus { outline:none; border-color:#ffd34d; }
+  .btn {
+    margin-top:1vh; padding:1.2vh 2.6vh; font-size:2.4vh; font-weight:800; cursor:pointer;
+    border:none; border-radius:1vh; background:#ffd34d; color:#11141c;
+  }
 </style>
 </head>
 <body>
@@ -70,11 +81,20 @@
     <span style="opacity:.7">Empezar la carrera: <b>0</b>, <b>S</b>, OK, Start del gamepad, o pulsa otra vez tu tecla de unirte (<b>5</b>/<b>G</b>)</span>
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
+  <p class="small">Tras unirte, <b>gira ◀▶</b> (4/6, A/D o cruceta) para elegir tu nombre &nbsp;·&nbsp; <b>8</b> → editar nombres ✏️</p>
   <p class="badge" id="startHint">Esperando jugadores…</p>
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v14</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v15</div>
+</div>
+
+<!-- EDITOR DE NOMBRES -->
+<div id="names" class="panel hidden">
+  <h1>✏️ Editar nombres</h1>
+  <p class="small">Usa un teclado (el Lenovo) para escribir. Pincha cada casilla y escribe. Estos nombres se podrán elegir luego en el lobby.</p>
+  <div id="nameInputs" class="nameedit"></div>
+  <button id="namesSave" class="btn">✅ Guardar y volver</button>
 </div>
 
 <!-- HI-SCORES -->
@@ -238,6 +258,9 @@ function keyNames(e){
   return n;
 }
 window.addEventListener('keydown', e=>{
+  // si se está escribiendo en una casilla de texto, dejar pasar la tecla tal cual
+  const ae=document.activeElement;
+  if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;
   lastKey = `${e.code||'?'}${e.key&&e.key!==e.code?' ('+e.key+')':''} #${e.keyCode}`;
   for(const n of keyNames(e)) markDown(n);
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Space'].includes(e.code)) e.preventDefault();
@@ -289,7 +312,7 @@ function readInput(p){
 //==================================================================
 // Estado de juego
 //==================================================================
-const STATE = { LOBBY:0, COUNTDOWN:1, RACE:2, RESULTS:3, HISCORES:4 };
+const STATE = { LOBBY:0, COUNTDOWN:1, RACE:2, RESULTS:3, HISCORES:4, NAMES:5 };
 let state = STATE.LOBBY;
 let players = [];          // persistente entre carreras (campeonato)
 let oils = [];             // {x,y,r,life}
@@ -314,6 +337,9 @@ const els = {
   hsTrack: document.getElementById('hsTrack'),
   hsRace: document.getElementById('hsRace'),
   hsLap: document.getElementById('hsLap'),
+  names: document.getElementById('names'),
+  nameInputs: document.getElementById('nameInputs'),
+  namesSave: document.getElementById('namesSave'),
 };
 
 //==================================================================
@@ -322,6 +348,11 @@ const els = {
 const LS_LAP = 'carGameLapList';    // Top-10 de vueltas rápidas por circuito
 const LS_RACE = 'carGameRaceList';  // Top-10 de tiempos de carrera por circuito
 const LS_CHAMP = 'carGameChamp';
+const LS_NAMES = 'carGameNames';    // roster de nombres elegibles
+const DEFAULT_NAMES = ['Rojo','Azul','Verde','Amarillo','Morado'];
+function getRoster(){ try{ const r=JSON.parse(localStorage.getItem(LS_NAMES)); return (Array.isArray(r)&&r.length)?r:DEFAULT_NAMES.slice(); }catch(e){ return DEFAULT_NAMES.slice(); } }
+function setRoster(r){ try{ localStorage.setItem(LS_NAMES, JSON.stringify(r)); }catch(e){} }
+let roster = getRoster();
 const TOP_N = 10;
 function loadMap(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
 function saveMap(k,m){ try{ localStorage.setItem(k, JSON.stringify(m)); }catch(e){} }
@@ -353,9 +384,10 @@ function renderLapRecord(){
 function newPlayer(src){
   const idx = players.length;
   const pal = PALETTE[idx % PALETTE.length];
+  const nameIdx = idx % roster.length;
   return {
     id: idx, src, pal,
-    name: 'Coche '+pal.name,
+    nameIdx, name: roster[nameIdx],            // nombre elegido del roster (gira ◀▶ en lobby)
     assistWalls: src.type==='kb' && src.profile===1,  // el 2º teclado (Lenovo) lleva paredes
     points: 0,                 // campeonato acumulado
     // estado de carrera reiniciable:
@@ -365,6 +397,18 @@ function newPlayer(src){
 }
 function hasKbProfile(i){ return players.some(p=>p.src.type==='kb'&&p.src.profile===i); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
+// flanco izquierda(-1)/derecha(+1) del mando de un jugador (para elegir nombre en lobby)
+function nameDirEdge(p){
+  if(p.src.type==='kb'){
+    const pr=KB_PROFILES[p.src.profile];
+    if(anyEdge(pr.left)) return -1;
+    if(anyEdge(pr.right)) return 1;
+  } else {
+    const gp=padList()[p.src.index];
+    if(gp){ if(padEdge(gp,14)) return -1; if(padEdge(gp,15)) return 1; }
+  }
+  return 0;
+}
 
 function lobbyJoin(){
   let start=false;
@@ -385,6 +429,11 @@ function lobbyJoin(){
       players.push(newPlayer({type:'pad', index:i}));
     }
   }
+  // elegir nombre: cada jugador gira ◀▶ para recorrer el roster
+  for(const p of players){
+    const d=nameDirEdge(p);
+    if(d){ p.nameIdx=((p.nameIdx+d)%roster.length+roster.length)%roster.length; p.name=roster[p.nameIdx]; }
+  }
   // auto-acelerar: número 1
   if(anyEdge(['1'])){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
   // cambiar de circuito: número 7 (siguiente) / 9 (anterior)
@@ -402,7 +451,7 @@ function renderLobby(){
     const p=players[i];
     if(p){
       html+=`<div class="pcard"><div class="dot" style="background:${p.pal.body}"></div>
-        <div class="who">${p.name}</div>
+        <div class="who">◀ ${p.name} ▶</div>
         <div class="src">${p.src.type==='kb'?KB_PROFILES[p.src.profile].label:'Gamepad '+(p.src.index+1)}</div></div>`;
     } else {
       html+=`<div class="pcard empty"><div class="dot" style="background:#2a3140"></div>
@@ -577,13 +626,34 @@ function closeHiscores(){
   if(hsFrom===STATE.RESULTS) players=[];   // venir de una carrera => lobby limpio
   state=STATE.LOBBY; els.lobby.classList.remove('hidden'); renderLapRecord();
 }
+function openNames(){
+  state=STATE.NAMES;
+  els.lobby.classList.add('hidden'); els.names.classList.remove('hidden');
+  // construir las casillas a partir del roster (mín. 5, máx. 8)
+  const n=Math.max(5, Math.min(8, roster.length));
+  let h='';
+  for(let i=0;i<n;i++) h+=`<label>Nombre ${i+1}<input type="text" maxlength="12" value="${(roster[i]||'').replace(/"/g,'&quot;')}"></label>`;
+  els.nameInputs.innerHTML=h;
+}
+function closeNames(){
+  const vals=[...els.nameInputs.querySelectorAll('input')].map(x=>x.value.trim()).filter(Boolean);
+  roster = vals.length ? vals : DEFAULT_NAMES.slice();
+  setRoster(roster);
+  // refrescar nombres de jugadores ya unidos
+  for(const p of players){ p.nameIdx=Math.min(p.nameIdx, roster.length-1); p.name=roster[p.nameIdx]; }
+  els.names.classList.add('hidden'); state=STATE.LOBBY; els.lobby.classList.remove('hidden');
+}
+els.namesSave.addEventListener('click', closeNames);
 
 function update(dt){
   // gamepads recién conectados pueden unirse en lobby
   if(state===STATE.LOBBY){
     if(anyEdge(['6'])){ openHiscores(STATE.LOBBY); return; }
+    if(anyEdge(['8'])){ openNames(); return; }
     lobbyJoin(); return;
   }
+
+  if(state===STATE.NAMES){ return; }   // todo se maneja con las casillas y el botón
 
   if(state===STATE.HISCORES){
     if(anyEdge(['7'])){ setTrack(trackIdx+1); renderHiscores(); }
