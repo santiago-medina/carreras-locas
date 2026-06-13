@@ -113,6 +113,24 @@ const HALF_IDX = Math.floor(center.length / 2);
 const HALF_PT = center[HALF_IDX];
 const TOTAL_LAPS = 3;
 
+// Línea de meta como SEGMENTO perpendicular a la pista (un poco más ancho que el
+// asfalto para no perder cruces por el borde). El cruce se detecta por intersección
+// de segmentos, así que funciona a cualquier velocidad y por cualquier carril.
+const FIN_PERP = START_DIR + Math.PI/2;
+const FIN_HALF = TRACK_HW * 1.3;
+const FIN_A = {x: START.x + Math.cos(FIN_PERP)*FIN_HALF, y: START.y + Math.sin(FIN_PERP)*FIN_HALF};
+const FIN_B = {x: START.x - Math.cos(FIN_PERP)*FIN_HALF, y: START.y - Math.sin(FIN_PERP)*FIN_HALF};
+// proyección de un punto sobre la dirección de carrera (signo = lado de la meta)
+function sideOfFinish(x,y){ return (x-START.x)*Math.cos(START_DIR) + (y-START.y)*Math.sin(START_DIR); }
+// ¿se cruzan los segmentos p1p2 y p3p4?
+function segCross(p1,p2,p3,p4){
+  const d=(p4.y-p3.y)*(p2.x-p1.x)-(p4.x-p3.x)*(p2.y-p1.y);
+  if(d===0) return false;
+  const ua=((p4.x-p3.x)*(p1.y-p3.y)-(p4.y-p3.y)*(p1.x-p3.x))/d;
+  const ub=((p2.x-p1.x)*(p1.y-p3.y)-(p2.y-p1.y)*(p1.x-p3.x))/d;
+  return ua>=0 && ua<=1 && ub>=0 && ub<=1;
+}
+
 function distToSeg(px,py,ax,ay,bx,by){
   const dx=bx-ax, dy=by-ay, len2=dx*dx+dy*dy||1;
   let t=((px-ax)*dx+(py-ay)*dy)/len2; t=Math.max(0,Math.min(1,t));
@@ -397,6 +415,7 @@ function stepCar(p, dt){
     c.angle += inp.steer*TURN*dt*sf*Math.sign(c.speed||1);
   }
 
+  const ox=c.x, oy=c.y;                 // posición previa (para el cruce de meta)
   c.x += Math.cos(c.angle)*c.speed*dt;
   c.y += Math.sin(c.angle)*c.speed*dt;
   c.x=Math.max(14,Math.min(WORLD_W-14,c.x));
@@ -409,13 +428,21 @@ function stepCar(p, dt){
     }
   }
 
-  // vueltas
-  if((c.x-HALF_PT.x)**2+(c.y-HALF_PT.y)**2 < TRACK_HW*TRACK_HW) p.checkpoint=true;
-  if(!p.finished){
-    const nearStart=(c.x-START.x)**2+(c.y-START.y)**2 < 75*75;
-    if(nearStart && p.checkpoint){
+  // progreso en la pista (segmento más cercano) — para ranking y checkpoint
+  const ti=trackInfo(c.x,c.y);
+  p.progress=(p.lap-1) + (ti.seg + ti.t)/center.length;
+
+  // checkpoint anti-trampa: haber pasado por la zona media del circuito
+  if(ti.seg>=HALF_IDX-1 && ti.seg<=HALF_IDX+1) p.checkpoint=true;
+
+  // META: cruce REAL de la línea, en sentido de carrera y con el checkpoint hecho.
+  // (intersección de segmentos -> robusto a cualquier velocidad y carril)
+  if(!p.finished && p.checkpoint){
+    const crossed = segCross({x:ox,y:oy},{x:c.x,y:c.y}, FIN_A, FIN_B);
+    const forward = sideOfFinish(ox,oy) < 0 && sideOfFinish(c.x,c.y) >= 0;
+    if(crossed && forward){
       const lapTime=raceClock-p.lapStart;
-      if(lapTime>3){
+      if(lapTime>2){
         if(p.bestLap===null||lapTime<p.bestLap) p.bestLap=lapTime;
         const rec=getBestLap();
         if(!rec || lapTime<rec.time) setBestLap({time:lapTime, name:p.name});
@@ -424,9 +451,6 @@ function stepCar(p, dt){
       }
     }
   }
-  // progreso global para ranking
-  const ti=trackInfo(c.x,c.y);
-  p.progress=(p.lap-1) + (ti.seg + ti.t)/center.length;
 }
 
 function finishPlayer(p){
