@@ -64,9 +64,9 @@
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
-  <p class="small">Récord de vuelta: <span id="lapRecord">—</span></p>
+  <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v10</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v11</div>
 </div>
 
 <!-- COUNTDOWN / RESULTS use canvas; RESULTS panel below -->
@@ -263,6 +263,7 @@ const els = {
   startHint: document.getElementById('startHint'),
   autoState: document.getElementById('autoState'),
   lapRecord: document.getElementById('lapRecord'),
+  raceRecord: document.getElementById('raceRecord'),
   resultTable: document.getElementById('resultTable'),
   champTable: document.getElementById('champTable'),
 };
@@ -271,15 +272,20 @@ const els = {
 // Persistencia (récords / campeonato)
 //==================================================================
 const LS_LAP = 'carGameBestLap';
+const LS_RACE = 'carGameBestRace';
 const LS_CHAMP = 'carGameChamp';
 function getBestLap(){ try{ return JSON.parse(localStorage.getItem(LS_LAP)); }catch(e){ return null; } }
 function setBestLap(v){ try{ localStorage.setItem(LS_LAP, JSON.stringify(v)); }catch(e){} }
+function getBestRace(){ try{ return JSON.parse(localStorage.getItem(LS_RACE)); }catch(e){ return null; } }
+function setBestRace(v){ try{ localStorage.setItem(LS_RACE, JSON.stringify(v)); }catch(e){} }
 function loadChamp(){ try{ return JSON.parse(localStorage.getItem(LS_CHAMP))||{}; }catch(e){ return {}; } }
 function saveChamp(c){ try{ localStorage.setItem(LS_CHAMP, JSON.stringify(c)); }catch(e){} }
 
 function renderLapRecord(){
   const r = getBestLap();
   els.lapRecord.textContent = r ? `${r.time.toFixed(2)}s (${r.name})` : '—';
+  const rr = getBestRace();
+  if(els.raceRecord) els.raceRecord.textContent = rr ? `${rr.time.toFixed(2)}s (${rr.name})` : '—';
 }
 
 //==================================================================
@@ -370,7 +376,7 @@ function beginCountdown(){
       angle: START_DIR, speed: 0,
     };
     p.lap=1; p.lapStart=0; p.checkpoint=false; p.bestLap=null;
-    p.finished=false; p.finishOrder=0; p.progress=0;
+    p.finished=false; p.finishOrder=0; p.finishTime=0; p.progress=0;
     p.spin=0; p.boostT=0; p.oilCd=0; p.boostCd=0;
   });
   countdown = 3.2;
@@ -480,8 +486,12 @@ function stepCar(p, dt){
 
 function finishPlayer(p){
   p.finished=true;
+  p.finishTime = raceClock;                       // tiempo total de las 3 vueltas
   p.finishOrder = players.filter(q=>q.finished).length;
-  if(leaderFinishTimer<0) leaderFinishTimer=20; // DNF tras 20s del líder
+  // récord de carrera completa (mejor tiempo en terminar)
+  const rec=getBestRace();
+  if(!rec || p.finishTime<rec.time) setBestRace({time:p.finishTime, name:p.name});
+  if(leaderFinishTimer<0) leaderFinishTimer=20;   // DNF tras 20s del líder
 }
 
 function carCollisions(){
@@ -562,10 +572,11 @@ function endRace(){
 
 function renderResults(){
   const ranked=[...players].sort((a,b)=>a.finishOrder-b.finishOrder);
-  let h='<table><tr><th>Pos</th><th>Coche</th><th>Mejor vuelta</th><th>Puntos</th></tr>';
+  let h='<table><tr><th>Pos</th><th>Coche</th><th>Tiempo total</th><th>Mejor vuelta</th><th>Puntos</th></tr>';
   for(const p of ranked){
     h+=`<tr><td class="pos">${p.finishOrder}º</td>
       <td><span class="row-swatch" style="background:${p.pal.body}"></span> ${p.name}</td>
+      <td>${p.finishTime?p.finishTime.toFixed(2)+'s':'—'}</td>
       <td>${p.bestLap?p.bestLap.toFixed(2)+'s':'—'}</td>
       <td>+${p.lastPts}</td></tr>`;
   }
