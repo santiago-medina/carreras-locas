@@ -21,6 +21,7 @@
     background: rgba(8,10,16,.86); padding: 4vh 4vw; box-sizing: border-box;
   }
   .panel.hidden { display: none; }
+  #lobby { background: rgba(8,10,16,.74); }   /* algo translúcido: se ve el circuito detrás */
   h1 { font-size: 5vh; margin: 0 0 1vh; letter-spacing: 1px; }
   h2 { font-size: 3.2vh; margin: 1vh 0; }
   p  { font-size: 2.2vh; margin: .6vh 0; opacity: .9; max-width: 80vw; }
@@ -63,16 +64,17 @@
   <p>Pantalla fija, todos en el mismo circuito. <span class="hint">Pulsa un botón para unirte.</span></p>
   <div id="playerCards" class="players"></div>
   <p class="small">
-    <b>Jugador 1 — mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>0</b> turbo · une con <b>5</b><br>
+    <b>Jugador 1 — mando TV (NÚMEROS):</b> <b>4</b> ◀ / <b>6</b> ▶ · <b>8</b> acelerar · <b>2</b> frenar · <b>5</b> aceite · <b>3</b> turbo · une con <b>5</b><br>
     <b>Jugador 2 — 2º teclado (LETRAS):</b> <b>A</b> ◀ / <b>D</b> ▶ · <b>W</b> acelerar · <b>S</b> frenar · <b>F</b> aceite · <b>Q</b> turbo · une con <b>G</b><br>
     <b>Gamepads:</b> stick/cruceta girar · <b>A</b> acelerar · <b>B</b> aceite · <b>X</b> turbo · une con <b>A</b><br>
     <span style="opacity:.7">Empezar la carrera: <b>0</b>, <b>S</b>, OK, Start del gamepad, o pulsa otra vez tu tecla de unirte (<b>5</b>/<b>G</b>)</span>
   </p>
   <div class="toggle">Auto-acelerar (fácil para peques): <b id="autoState">ACTIVADO</b> &nbsp;<span class="small">(número 1 para cambiar)</span></div>
   <p class="badge" id="startHint">Esperando jugadores…</p>
+  <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span></p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v12</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v13</div>
 </div>
 
 <!-- COUNTDOWN / RESULTS use canvas; RESULTS panel below -->
@@ -111,25 +113,47 @@ resize();
 // Circuito (línea central + ancho). Bucle cerrado, todo visible.
 //==================================================================
 const TRACK_HW = 72; // medio ancho del asfalto
-const center = [
-  {x:300,y:650},{x:250,y:450},{x:320,y:280},{x:520,y:210},
-  {x:760,y:250},{x:820,y:430},{x:980,y:470},{x:1080,y:330},
-  {x:1020,y:200},{x:1200,y:170},{x:1380,y:300},{x:1360,y:560},
-  {x:1180,y:700},{x:880,y:720},{x:620,y:690},{x:440,y:730}
+// Generador de circuitos: bucle cerrado y SUAVE (radio siempre positivo => nunca
+// se cruza consigo mismo). lobes/amp dan la forma (óvalo, ondulado, trébol…).
+function genLoop(cx,cy,rx,ry,lobes,amp,phase,n){
+  const pts=[];
+  for(let k=0;k<n;k++){
+    const a=phase + k/n*Math.PI*2;
+    const r=1 + amp*Math.sin(lobes*a);
+    pts.push({x: Math.round(cx+Math.cos(a)*rx*r), y: Math.round(cy+Math.sin(a)*ry*r)});
+  }
+  return pts;
+}
+const TRACKS = [
+  { name:'Clásico', pts:[
+    {x:300,y:650},{x:250,y:450},{x:320,y:280},{x:520,y:210},
+    {x:760,y:250},{x:820,y:430},{x:980,y:470},{x:1080,y:330},
+    {x:1020,y:200},{x:1200,y:170},{x:1380,y:300},{x:1360,y:560},
+    {x:1180,y:700},{x:880,y:720},{x:620,y:690},{x:440,y:730} ] },
+  { name:'Óvalo veloz', pts: genLoop(800,450, 600,300, 0, 0.00, -Math.PI/2, 14) },
+  { name:'Ondulado',    pts: genLoop(800,450, 560,300, 3, 0.14, -Math.PI/2, 18) },
+  { name:'Trébol',      pts: genLoop(800,450, 520,290, 4, 0.16,  0,         20) },
+  { name:'Cacahuete',   pts: genLoop(800,450, 600,300, 2, 0.16, -Math.PI/2, 16) },
 ];
-const START = center[0];
-const START_DIR = Math.atan2(center[1].y - START.y, center[1].x - START.x);
-const HALF_IDX = Math.floor(center.length / 2);
-const HALF_PT = center[HALF_IDX];
 const TOTAL_LAPS = 3;
 
-// Línea de meta como SEGMENTO perpendicular a la pista (un poco más ancho que el
-// asfalto para no perder cruces por el borde). El cruce se detecta por intersección
-// de segmentos, así que funciona a cualquier velocidad y por cualquier carril.
-const FIN_PERP = START_DIR + Math.PI/2;
-const FIN_HALF = TRACK_HW * 1.3;
-const FIN_A = {x: START.x + Math.cos(FIN_PERP)*FIN_HALF, y: START.y + Math.sin(FIN_PERP)*FIN_HALF};
-const FIN_B = {x: START.x - Math.cos(FIN_PERP)*FIN_HALF, y: START.y - Math.sin(FIN_PERP)*FIN_HALF};
+// Pista activa y todo lo derivado de ella (se recalcula al cambiar de circuito).
+// La meta es un SEGMENTO perpendicular a la pista; el cruce se detecta por
+// intersección de segmentos (robusto a cualquier velocidad/carril).
+let trackIdx=0, center, START, START_DIR, HALF_IDX, HALF_PT, FIN_PERP, FIN_HALF, FIN_A, FIN_B;
+function setTrack(i){
+  trackIdx=((i%TRACKS.length)+TRACKS.length)%TRACKS.length;
+  center=TRACKS[trackIdx].pts;
+  START=center[0];
+  START_DIR=Math.atan2(center[1].y-START.y, center[1].x-START.x);
+  HALF_IDX=Math.floor(center.length/2);
+  HALF_PT=center[HALF_IDX];
+  FIN_PERP=START_DIR+Math.PI/2;
+  FIN_HALF=TRACK_HW*1.3;
+  FIN_A={x:START.x+Math.cos(FIN_PERP)*FIN_HALF, y:START.y+Math.sin(FIN_PERP)*FIN_HALF};
+  FIN_B={x:START.x-Math.cos(FIN_PERP)*FIN_HALF, y:START.y-Math.sin(FIN_PERP)*FIN_HALF};
+}
+setTrack(0);
 // proyección de un punto sobre la dirección de carrera (signo = lado de la meta)
 function sideOfFinish(x,y){ return (x-START.x)*Math.cos(START_DIR) + (y-START.y)*Math.sin(START_DIR); }
 // ¿se cruzan los segmentos p1p2 y p3p4?
@@ -172,9 +196,9 @@ const PALETTE = [
 // Perfiles de teclado: cada uno usa TECLAS DISTINTAS para que dos jugadores
 // puedan compartir el mismo "teclado" (mando TV con números + 2º teclado con letras).
 const KB_PROFILES = [
-  { label:'Números (mando TV): 4/6 · 5 aceite · 0 turbo', join:['5'],
+  { label:'Números (mando TV): 4/6 · 5 aceite · 3 turbo', join:['5'],
     left:['4','ArrowLeft'], right:['6','ArrowRight'], accel:['8','ArrowUp'],
-    brake:['2','ArrowDown'], oil:['5','Enter'], boost:['0'] },
+    brake:['2','ArrowDown'], oil:['5','Enter'], boost:['3'] },
   { label:'Letras (2º teclado): A/D · F aceite · Q turbo', join:['g','G'],
     left:['a','A'], right:['d','D'], accel:['w','W'],
     brake:['s','S'], oil:['f','F'], boost:['q','Q'] },
@@ -271,6 +295,7 @@ const els = {
   autoState: document.getElementById('autoState'),
   lapRecord: document.getElementById('lapRecord'),
   raceRecord: document.getElementById('raceRecord'),
+  trackName: document.getElementById('trackName'),
   resultTable: document.getElementById('resultTable'),
   champTable: document.getElementById('champTable'),
 };
@@ -281,10 +306,13 @@ const els = {
 const LS_LAP = 'carGameBestLap';
 const LS_RACE = 'carGameBestRace';
 const LS_CHAMP = 'carGameChamp';
-function getBestLap(){ try{ return JSON.parse(localStorage.getItem(LS_LAP)); }catch(e){ return null; } }
-function setBestLap(v){ try{ localStorage.setItem(LS_LAP, JSON.stringify(v)); }catch(e){} }
-function getBestRace(){ try{ return JSON.parse(localStorage.getItem(LS_RACE)); }catch(e){ return null; } }
-function setBestRace(v){ try{ localStorage.setItem(LS_RACE, JSON.stringify(v)); }catch(e){} }
+function loadMap(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
+function saveMap(k,m){ try{ localStorage.setItem(k, JSON.stringify(m)); }catch(e){} }
+function trackKey(){ return TRACKS[trackIdx].name; }   // récords separados por circuito
+function getBestLap(){ return loadMap(LS_LAP)[trackKey()]||null; }
+function setBestLap(v){ const m=loadMap(LS_LAP); m[trackKey()]=v; saveMap(LS_LAP,m); }
+function getBestRace(){ return loadMap(LS_RACE)[trackKey()]||null; }
+function setBestRace(v){ const m=loadMap(LS_RACE); m[trackKey()]=v; saveMap(LS_RACE,m); }
 function loadChamp(){ try{ return JSON.parse(localStorage.getItem(LS_CHAMP))||{}; }catch(e){ return {}; } }
 function saveChamp(c){ try{ localStorage.setItem(LS_CHAMP, JSON.stringify(c)); }catch(e){} }
 
@@ -335,6 +363,9 @@ function lobbyJoin(){
   }
   // auto-acelerar: número 1
   if(anyEdge(['1'])){ autoAccel=!autoAccel; els.autoState.textContent = autoAccel?'ACTIVADO':'DESACTIVADO'; }
+  // cambiar de circuito: número 7 (siguiente) / 9 (anterior)
+  if(anyEdge(['7'])){ setTrack(trackIdx+1); renderLapRecord(); }
+  if(anyEdge(['9'])){ setTrack(trackIdx-1); renderLapRecord(); }
   // empezar: número 0, S, Enter/OK, o Start de un gamepad ya unido
   if(anyEdge(['0','Enter','s','S'])) start=true;
   for(const p of players){ if(p.src.type==='pad'){ const gp=pads[p.src.index]; if(gp&&padEdge(gp,9)) start=true; } }
@@ -355,6 +386,7 @@ function renderLobby(){
     }
   }
   els.cards.innerHTML=html;
+  if(els.trackName) els.trackName.textContent = TRACKS[trackIdx].name;
   els.startHint.textContent = players.length>=1
     ? `${players.length} jugador${players.length>1?'es':''} — pulsa START (o tecla S) para empezar`
     : 'Esperando jugadores…';
@@ -672,14 +704,17 @@ function drawHUD(){
   }
 }
 function drawCountdown(){
+  ctx.textAlign='center';
+  ctx.fillStyle='#ffd34d'; ctx.font='bold 40px system-ui';
+  ctx.fillText('Circuito: '+TRACKS[trackIdx].name, WORLD_W/2, WORLD_H/2-110);
   const n=Math.ceil(countdown-0.2);
-  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 140px system-ui';
+  ctx.fillStyle='#fff'; ctx.font='bold 140px system-ui';
   ctx.fillText(n>0?n:'¡YA!', WORLD_W/2, WORLD_H/2+50);
 }
 // Leyenda de teclas abajo a la derecha (solo los esquemas que hay en juego)
 function drawLegend(){
   const lines=[];
-  if(players.some(p=>p.src.type==='kb'&&p.src.profile===0)) lines.push('Mando TV:  4 ◀  6 ▶  ·  8 acel  ·  5 aceite  ·  0 turbo');
+  if(players.some(p=>p.src.type==='kb'&&p.src.profile===0)) lines.push('Mando TV:  4 ◀  6 ▶  ·  8 acel  ·  5 aceite  ·  3 turbo');
   if(players.some(p=>p.src.type==='kb'&&p.src.profile===1)) lines.push('Lenovo:  A ◀  D ▶  ·  W acel  ·  F aceite  ·  Q turbo  🧱');
   if(players.some(p=>p.src.type==='pad'))                    lines.push('Gamepad:  stick ◀▶  ·  A acel  ·  B aceite  ·  X turbo');
   if(!lines.length) return;
