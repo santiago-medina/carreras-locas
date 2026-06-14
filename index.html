@@ -100,7 +100,7 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v30</div>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v31</div>
 </div>
 
 <!-- TIENDA -->
@@ -294,8 +294,8 @@ const CARS = [
   { id:9, name:'Bala Arcoíris',  price:2000, spd:1.40, shape:'bala',      body:'#9b59b6', accent:'#ffffff' },
 ];
 function carById(id){ return CARS.find(c=>c.id===id) || CARS[0]; }
-// multiplicador de monedas según calidad del coche (Básico x1 … Bala x3)
-function coinMult(spd){ return 1 + (spd-1)*5; }
+// multiplicador de monedas según calidad del coche (Básico x1 … Bala x5)
+function coinMult(spd){ return 1 + (spd-1)*10; }
 // precarga de las imágenes (todas apuntan hacia ARRIBA: -y)
 const carImages = {};
 CARS.forEach(c=>{ const im=new Image(); im.src='assets/cars/'+c.id+'.png'; carImages[c.id]=im; });
