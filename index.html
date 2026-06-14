@@ -100,7 +100,8 @@
   <p class="small">🏁 Circuito: <b id="trackName" style="color:#ffd34d">Clásico</b> &nbsp;<span style="opacity:.7">(cambia con <b>7</b> ▸ / <b>9</b> ◂)</span> &nbsp;·&nbsp; <b>6</b> → Hi-Scores 🏆</p>
   <p class="small">Récord de vuelta: <span id="lapRecord">—</span> &nbsp;·&nbsp; Récord de carrera (3 vueltas): <span id="raceRecord">—</span></p>
   <p class="small" id="diag" style="opacity:.6">Diagnóstico: …</p>
-  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v31</div>
+  <p class="small" id="saveWarn" style="display:none;color:#ff7b6b;font-weight:700">⚠️ Este navegador podría NO guardar el progreso al cerrar (¿modo incógnito?). Usa una ventana normal.</p>
+  <div id="ver" style="position:absolute;bottom:8px;right:12px;font-size:1.7vh;opacity:.55">v32</div>
 </div>
 
 <!-- TIENDA -->
@@ -616,6 +617,8 @@ function renderLobby(){
   for(let i=0;i<pads.length;i++) if(pads[i]) nPads++;
   const diag=document.getElementById('diag');
   if(diag) diag.textContent = `Diagnóstico — Gamepads: ${nPads} · Última tecla: ${lastKey} · Guardado: ${persistState}`;
+  const warn=document.getElementById('saveWarn');
+  if(warn) warn.style.display = (persistState==='NO persistente'||persistState==='no soportado') ? '' : 'none';
 }
 
 //==================================================================
