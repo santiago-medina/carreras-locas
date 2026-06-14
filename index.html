@@ -72,8 +72,9 @@
   .carcard.sel { border-color:#ffd34d; box-shadow:0 0 2vh rgba(255,211,77,.55); }
   .carcard.locked { opacity:.5; }
   .carprev { width:13vh; height:13vh; object-fit:contain; image-rendering:auto; }
-  .spdrow { display:flex; align-items:center; gap:.6vh; font-size:1.5vh; }
-  .spdbar { width:11vh; height:1.2vh; background:#2a3140; border-radius:1vh; overflow:hidden; }
+  .spdrow { display:flex; align-items:center; gap:.6vh; font-size:1.5vh; margin:.2vh 0; }
+  .stlab { width:3.6vh; font-size:1.4vh; opacity:.75; text-align:left; }
+  .spdbar { flex:1; height:1.2vh; background:#2a3140; border-radius:1vh; overflow:hidden; }
   .spdbar > i { display:block; height:100%; background:linear-gradient(90deg,#7ee081,#ffd34d); }
   .carcard .cname { font-size:1.9vh; font-weight:700; }
   .carcard .cprice { font-size:1.7vh; }
@@ -146,7 +147,7 @@
 // === Auto-actualización ===
 // Compara con la versión publicada (version.txt, sin caché). Si hay una nueva,
 // recarga a una URL nueva (?v=NUEVA) que el navegador no tiene cacheada -> versión fresca.
-const APP_VERSION = '33';
+const APP_VERSION = '34';
 (function(){
   const ve = document.getElementById('ver'); if(ve) ve.textContent = 'v'+APP_VERSION;
   fetch('version.txt?cb='+Date.now(), {cache:'no-store'})
@@ -298,18 +299,18 @@ const PALETTE = [
 
 // Catálogo de la tienda. id 0 = básico (gratis, usa el color del jugador).
 // El resto son coches con color/franja propios que se compran con monedas.
-// spd = multiplicador de velocidad. Cuanto más caro, más rápido (y se ve en la tienda).
+// spd=velocidad, acc=aceleración, han=manejo. Todas mejores cuanto más caro (se ven en la tienda).
 const CARS = [
-  { id:0, name:'Básico',         price:0,    spd:1.00, shape:'basico',    body:null,      accent:'#bfe3ff' },
-  { id:1, name:'Deportivo Rojo', price:120,  spd:1.06, shape:'deportivo', body:'#e8473f', accent:'#ffd34d' },
-  { id:2, name:'Deportivo Azul', price:160,  spd:1.09, shape:'deportivo', body:'#2f6fe0', accent:'#bfe3ff' },
-  { id:3, name:'Buggy Verde',    price:240,  spd:1.12, shape:'buggy',     body:'#27a046', accent:'#d6ffe0' },
-  { id:4, name:'Buggy Rosa',     price:340,  spd:1.15, shape:'buggy',     body:'#e85ca8', accent:'#ffd6ef' },
-  { id:5, name:'Camión Naranja', price:480,  spd:1.18, shape:'camion',    body:'#ef7d2a', accent:'#ffe0a0' },
-  { id:6, name:'Furgo Aqua',     price:650,  spd:1.21, shape:'furgo',     body:'#1fb6b6', accent:'#d3fffb' },
-  { id:7, name:'F1 Sombra',      price:900,  spd:1.27, shape:'f1',        body:'#2a2f3a', accent:'#8aa0c0' },
-  { id:8, name:'F1 Dorado',      price:1300, spd:1.32, shape:'f1',        body:'#d9a92a', accent:'#fff2b0' },
-  { id:9, name:'Bala Arcoíris',  price:2000, spd:1.40, shape:'bala',      body:'#9b59b6', accent:'#ffffff' },
+  { id:0, name:'Básico',         price:0,    spd:1.00, acc:1.00, han:1.00, shape:'basico',    body:null,      accent:'#bfe3ff' },
+  { id:1, name:'Deportivo Rojo', price:120,  spd:1.06, acc:1.05, han:1.04, shape:'deportivo', body:'#e8473f', accent:'#ffd34d' },
+  { id:2, name:'Deportivo Azul', price:160,  spd:1.09, acc:1.08, han:1.07, shape:'deportivo', body:'#2f6fe0', accent:'#bfe3ff' },
+  { id:3, name:'Buggy Verde',    price:240,  spd:1.12, acc:1.11, han:1.10, shape:'buggy',     body:'#27a046', accent:'#d6ffe0' },
+  { id:4, name:'Buggy Rosa',     price:340,  spd:1.15, acc:1.14, han:1.13, shape:'buggy',     body:'#e85ca8', accent:'#ffd6ef' },
+  { id:5, name:'Camión Naranja', price:480,  spd:1.18, acc:1.17, han:1.16, shape:'camion',    body:'#ef7d2a', accent:'#ffe0a0' },
+  { id:6, name:'Furgo Aqua',     price:650,  spd:1.21, acc:1.20, han:1.19, shape:'furgo',     body:'#1fb6b6', accent:'#d3fffb' },
+  { id:7, name:'F1 Sombra',      price:900,  spd:1.27, acc:1.25, han:1.23, shape:'f1',        body:'#2a2f3a', accent:'#8aa0c0' },
+  { id:8, name:'F1 Dorado',      price:1300, spd:1.32, acc:1.30, han:1.27, shape:'f1',        body:'#d9a92a', accent:'#fff2b0' },
+  { id:9, name:'Bala Arcoíris',  price:2000, spd:1.40, acc:1.38, han:1.32, shape:'bala',      body:'#9b59b6', accent:'#ffffff' },
 ];
 function carById(id){ return CARS.find(c=>c.id===id) || CARS[0]; }
 // multiplicador de monedas según calidad del coche (Básico x1 … Bala x5)
@@ -536,7 +537,7 @@ function newPlayer(src){
   const p = {
     id: idx, src, pal,
     nameIdx, name: roster[nameIdx],            // nombre elegido del roster (gira ◀▶ en lobby)
-    body: pal.body, accent:'#bfe3ff', shape:'basico', carId:0, spd:1,   // coche (se ajusta al equipado)
+    body: pal.body, accent:'#bfe3ff', shape:'basico', carId:0, spd:1, acc:1, han:1,   // coche equipado
     assistWalls: src.type==='kb' && src.profile===1,  // el 2º teclado (Lenovo) lleva paredes
     points: 0,                 // campeonato acumulado
     // estado de carrera reiniciable:
@@ -553,7 +554,8 @@ function refreshPlayerCar(p){
   p.accent = sty ? sty.accent : '#bfe3ff';
   p.shape = sty ? sty.shape : 'basico';
   p.carId = getGarage(p.name).selected;   // id del coche equipado (0 = básico)
-  p.spd = carById(p.carId).spd;           // multiplicador de velocidad del coche
+  const car = carById(p.carId);
+  p.spd = car.spd;  p.acc = car.acc;  p.han = car.han;   // velocidad / aceleración / manejo
 }
 function hasKbProfile(i){ return players.some(p=>p.src.type==='kb'&&p.src.profile===i); }
 function hasPadPlayer(i){ return players.some(p=>p.src.type==='pad'&&p.src.index===i); }
@@ -691,12 +693,12 @@ function stepCar(p, dt){
     c.speed *= (1 - 1.6*dt);
   } else {
     const off=!onTrack(c.x,c.y);
-    const spd=p.spd||1;                        // coche más caro => más rápido
+    const spd=p.spd||1, acc=p.acc||1, han=p.han||1;   // velocidad / aceleración / manejo
     const offMax=OFF_MAX*spd;
     let top = (off?offMax:MAX_SPEED*spd);
     if(p.boostT>0) top*=BOOST_MULT;
 
-    if(inp.throttle>0) c.speed += ACCEL*spd*dt*(p.boostT>0?1.5:1);
+    if(inp.throttle>0) c.speed += ACCEL*acc*dt*(p.boostT>0?1.5:1);
     else if(inp.throttle<0) c.speed -= BRAKE*dt;
     else { c.speed -= c.speed*FRICTION*dt; if(Math.abs(c.speed)<2) c.speed=0; }
 
@@ -704,7 +706,7 @@ function stepCar(p, dt){
     if(off && c.speed>offMax && p.boostT<=0) c.speed=offMax;
 
     const sf=Math.min(1, Math.abs(c.speed)/110);
-    c.angle += inp.steer*TURN*dt*sf*Math.sign(c.speed||1);
+    c.angle += inp.steer*TURN*han*dt*sf*Math.sign(c.speed||1);
   }
 
   const ox=c.x, oy=c.y;                 // posición previa (para el cruce de meta)
@@ -852,11 +854,13 @@ function renderShop(){
     if(equipped) tag='<span class="ctag" style="color:#7ee081">✓ EN USO</span>';
     else if(owned) tag='<span class="ctag" style="color:#9fb4d8">comprado</span>';
     else tag=`<span class="ctag" style="color:#ffd34d">🪙 ${c.price}</span>`;
-    const pct = Math.round(20 + (c.spd-1.00)/0.40*80);   // barra de velocidad (20%..100%)
+    const bar = (lab,val)=>{ const pct=Math.round(20+(val-1.00)/0.40*80);
+      return `<div class="spdrow"><span class="stlab">${lab}</span><div class="spdbar"><i style="width:${pct}%"></i></div></div>`; };
     h+=`<div class="${cls}">
       <img class="carprev" src="assets/cars/${c.id}.png" alt="${c.name}" loading="lazy">
       <div class="cname">${c.name}</div>
-      <div class="spdrow">⚡<div class="spdbar"><i style="width:${pct}%"></i></div> 🪙×${coinMult(c.spd).toFixed(1)}</div>
+      ${bar('Vel',c.spd)}${bar('Ace',c.acc)}${bar('Man',c.han)}
+      <div class="spdrow" style="opacity:.85;font-size:1.4vh">🪙×${coinMult(c.spd).toFixed(1)} monedas</div>
       ${tag}</div>`;
   });
   els.shopGrid.innerHTML=h;
