@@ -72,10 +72,10 @@
   .carcard.sel { border-color:#ffd34d; box-shadow:0 0 2vh rgba(255,211,77,.55); }
   .carcard.locked { opacity:.5; }
   .carprev { width:13vh; height:13vh; object-fit:contain; image-rendering:auto; }
-  .spdrow { display:flex; align-items:center; gap:.6vh; font-size:1.5vh; margin:.2vh 0; }
-  .stlab { width:3.6vh; font-size:1.4vh; opacity:.75; text-align:left; }
-  .spdbar { flex:1; height:1.2vh; background:#2a3140; border-radius:1vh; overflow:hidden; }
-  .spdbar > i { display:block; height:100%; background:linear-gradient(90deg,#7ee081,#ffd34d); }
+  .spdrow { display:flex; align-items:center; gap:.8vh; font-size:1.7vh; margin:.5vh 0; width:100%; }
+  .stlab { width:4.4vh; font-size:1.6vh; font-weight:700; opacity:.9; text-align:left; }
+  .spdbar { flex:1; height:1.9vh; background:#2a3140; border:.2vh solid #3a4150; border-radius:1vh; overflow:hidden; }
+  .spdbar > i { display:block; height:100%; background:linear-gradient(90deg,#46d36a,#ffd34d); }
   .carcard .cname { font-size:1.9vh; font-weight:700; }
   .carcard .cprice { font-size:1.7vh; }
   .carcard .ctag { font-size:1.5vh; font-weight:800; }
@@ -147,7 +147,7 @@
 // === Auto-actualización ===
 // Compara con la versión publicada (version.txt, sin caché). Si hay una nueva,
 // recarga a una URL nueva (?v=NUEVA) que el navegador no tiene cacheada -> versión fresca.
-const APP_VERSION = '34';
+const APP_VERSION = '35';
 (function(){
   const ve = document.getElementById('ver'); if(ve) ve.textContent = 'v'+APP_VERSION;
   fetch('version.txt?cb='+Date.now(), {cache:'no-store'})
